@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -74,12 +75,12 @@ export default function AdminPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans text-black">
-            <aside className="w-full md:w-64 bg-black text-white p-6">
+            <aside className="w-full md:w-64 bg-black/90 backdrop-blur-xl border-r border-white/10 text-white p-6">
                 <h1 className="text-2xl font-black italic mb-8">DOORWAY <span className="text-[#D4AF37]">DETAIL</span></h1>
                 <div className="space-y-4">
                     <div className="bg-white/10 text-[#D4AF37] px-4 py-3 rounded-xl font-bold flex items-center gap-3"><User size={20} /> Dashboard</div>
                 </div>
-                <button onClick={() => signOut(auth)} className="mt-20 text-gray-400 hover:text-white flex items-center gap-2"><LogOut size={16} /> Sign Out</button>
+                <button onClick={() => signOut(auth)} className="mt-20 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"><LogOut size={16} /> Sign Out</button>
             </aside>
 
             <main className="flex-1 p-6 md:p-10 overflow-auto">
@@ -119,32 +120,42 @@ export default function AdminPage() {
                     </div>
 
                     {/* JOB LIST */}
-                    <div className="grid gap-6">
-                        {jobs.map((job) => (
-                            <div key={job.id} className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col md:flex-row justify-between gap-6">
-                                <div className="space-y-2 flex-1">
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="text-xl font-bold">{job.name || 'Unknown'}</h3>
-                                        <span className={`px-2 py-1 text-xs font-bold rounded ${job.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>{job.status}</span>
+                    <AnimatePresence mode="popLayout">
+                        <div className="grid gap-6">
+                            {jobs.map((job) => (
+                                <motion.div
+                                    key={job.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                    whileHover={{ scale: 1.02, y: -4 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                    className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col md:flex-row justify-between gap-6 cursor-pointer"
+                                >
+                                    <div className="space-y-2 flex-1">
+                                        <div className="flex items-center gap-3">
+                                            <h3 className="text-xl font-bold">{job.name || 'Unknown'}</h3>
+                                            <span className={`px-2 py-1 text-xs font-bold rounded ${job.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>{job.status}</span>
+                                        </div>
+                                        <div className="text-sm text-gray-500 flex gap-4">
+                                            <span className="flex items-center gap-1"><MapPin size={14} /> {job.address}</span>
+                                            <span className="flex items-center gap-1"><Phone size={14} /> {job.phone}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-2 bg-gray-50 p-2 rounded w-fit">
+                                            <span className="font-bold text-gray-400">$</span>
+                                            <input type="number" defaultValue={job.price} onBlur={(e) => handlePrice(job.id, e.target.value)} className="bg-transparent font-bold w-20 outline-none" />
+                                            {job.price && <a href={`/invoice/${job.id}`} target="_blank" className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline"><FileText size={12} /> Invoice</a>}
+                                        </div>
                                     </div>
-                                    <div className="text-sm text-gray-500 flex gap-4">
-                                        <span className="flex items-center gap-1"><MapPin size={14} /> {job.address}</span>
-                                        <span className="flex items-center gap-1"><Phone size={14} /> {job.phone}</span>
+                                    <div className="flex flex-col gap-2 justify-center border-l pl-6">
+                                        {job.status === 'LEAD_RECEIVED' && <button onClick={() => handleStatusUpdate(job.id, 'SCHEDULED')} className="bg-black text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-[#D4AF37] hover:text-black transition-all">Schedule</button>}
+                                        {job.status === 'SCHEDULED' && <button onClick={() => handleStatusUpdate(job.id, 'COMPLETED')} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-all">Complete</button>}
+                                        <button onClick={() => handleDelete(job.id)} className="bg-red-50 text-red-500 px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-all"><Trash2 size={14} /> Delete</button>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-2 bg-gray-50 p-2 rounded w-fit">
-                                        <span className="font-bold text-gray-400">$</span>
-                                        <input type="number" defaultValue={job.price} onBlur={(e) => handlePrice(job.id, e.target.value)} className="bg-transparent font-bold w-20 outline-none" />
-                                        {job.price && <a href={`/invoice/${job.id}`} target="_blank" className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline"><FileText size={12} /> Invoice</a>}
-                                    </div>
-                                </div>
-                                <div className="flex flex-col gap-2 justify-center border-l pl-6">
-                                    {job.status === 'LEAD_RECEIVED' && <button onClick={() => handleStatusUpdate(job.id, 'SCHEDULED')} className="bg-black text-white px-4 py-2 rounded-lg font-bold text-sm">Schedule</button>}
-                                    {job.status === 'SCHEDULED' && <button onClick={() => handleStatusUpdate(job.id, 'COMPLETED')} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Complete</button>}
-                                    <button onClick={() => handleDelete(job.id)} className="bg-red-50 text-red-500 px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2"><Trash2 size={14} /> Delete</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </AnimatePresence>
                 </div>
             </main>
         </div>
