@@ -147,11 +147,17 @@ export default function Home() {
           <div className="h-px bg-zinc-800 w-full mb-8"></div>
 
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-zinc-500 text-sm">
-            <p>&copy; {new Date().getFullYear()} Doorway Detail. All rights reserved.</p>
+            <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center">
+              <p>&copy; {new Date().getFullYear()} Doorway Detail. All rights reserved.</p>
+              <div className="flex gap-4">
+                <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+                <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+              </div>
+            </div>
             <p>Detail Done Flawlessly</p>
           </div>
         </div>
       </footer>
-    </div>
+    </div >
   );
 }
