@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -23,8 +23,11 @@ import {
     User,
     LogOut,
     Trash2,
-    FileText
+    FileText,
+    DollarSign,
+    TrendingUp
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface Job {
     id: string;
@@ -60,6 +63,44 @@ export default function AdminPage() {
         });
         return () => unsubscribeAuth();
     }, [router]);
+
+    // Calculate Revenue Metrics
+    const revenueMetrics = useMemo(() => {
+        const totalRevenue = jobs
+            .filter(j => j.status === 'COMPLETED' && j.price)
+            .reduce((sum, j) => sum + (j.price || 0), 0);
+
+        const potentialRevenue = jobs
+            .filter(j => j.status !== 'COMPLETED' && j.price)
+            .reduce((sum, j) => sum + (j.price || 0), 0);
+
+        const completedRevenue = jobs
+            .filter(j => j.status === 'COMPLETED' && j.price)
+            .reduce((sum, j) => sum + (j.price || 0), 0);
+
+        const scheduledRevenue = jobs
+            .filter(j => j.status === 'SCHEDULED' && j.price)
+            .reduce((sum, j) => sum + (j.price || 0), 0);
+
+        const leadRevenue = jobs
+            .filter(j => j.status === 'LEAD_RECEIVED' && j.price)
+            .reduce((sum, j) => sum + (j.price || 0), 0);
+
+        return {
+            totalRevenue,
+            potentialRevenue,
+            completedRevenue,
+            scheduledRevenue,
+            leadRevenue
+        };
+    }, [jobs]);
+
+    // Chart Data
+    const chartData = [
+        { name: 'Leads', value: revenueMetrics.leadRevenue, fill: '#fbbf24' },
+        { name: 'Scheduled', value: revenueMetrics.scheduledRevenue, fill: '#3b82f6' },
+        { name: 'Completed', value: revenueMetrics.completedRevenue, fill: '#D4AF37' }
+    ];
 
     // DELETE FUNCTION
     const handleDelete = async (jobId: string) => {
@@ -136,11 +177,84 @@ export default function AdminPage() {
 
             {/* Main Content */}
             <main className="flex-1 p-6 md:p-10 overflow-auto">
-                <div className="max-w-6xl mx-auto">
-                    <h2 className="text-3xl font-bold text-gray-900 mb-8">
-                        Mission Control ({jobs.length})
+                <div className="max-w-7xl mx-auto space-y-8">
+                    <h2 className="text-3xl font-bold text-gray-900">
+                        Mission Control
                     </h2>
 
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Active Jobs */}
+                        <div className="bg-white px-6 py-5 rounded-2xl shadow-sm border border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">Active Jobs</div>
+                                <TrendingUp size={18} className="text-gray-400" />
+                            </div>
+                            <div className="text-3xl font-black text-black">{jobs.length}</div>
+                        </div>
+
+                        {/* Total Revenue */}
+                        <div className="bg-gradient-to-br from-[#D4AF37] to-[#b5952f] px-6 py-5 rounded-2xl shadow-lg border-2 border-[#D4AF37]">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-black/70 uppercase font-bold tracking-wider">Total Revenue</div>
+                                <DollarSign size={18} className="text-black/70" />
+                            </div>
+                            <div className="text-3xl font-black text-black">
+                                ${revenueMetrics.totalRevenue.toFixed(2)}
+                            </div>
+                        </div>
+
+                        {/* Potential Revenue */}
+                        <div className="bg-white px-6 py-5 rounded-2xl shadow-sm border border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">Pipeline Value</div>
+                                <TrendingUp size={18} className="text-blue-500" />
+                            </div>
+                            <div className="text-3xl font-black text-blue-600">
+                                ${revenueMetrics.potentialRevenue.toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Revenue Overview Chart */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                            <TrendingUp className="text-[#D4AF37]" size={20} />
+                            Revenue Overview
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <XAxis
+                                    dataKey="name"
+                                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                                    axisLine={{ stroke: '#e5e7eb' }}
+                                />
+                                <YAxis
+                                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                                    axisLine={{ stroke: '#e5e7eb' }}
+                                    tickFormatter={(value) => `$${value}`}
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: '#000',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        color: '#fff',
+                                        padding: '12px'
+                                    }}
+                                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']}
+                                />
+                                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Jobs List */}
                     {jobs.length === 0 ? (
                         <div className="bg-white rounded-3xl p-10 text-center border border-gray-200 shadow-sm">
                             <p className="text-gray-500 text-lg">No quotes received yet.</p>
@@ -160,10 +274,10 @@ export default function AdminPage() {
                                             </h3>
                                             <span
                                                 className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${job.status === 'COMPLETED'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : job.status === 'SCHEDULED'
-                                                            ? 'bg-blue-100 text-blue-700'
-                                                            : 'bg-yellow-100 text-yellow-800'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : job.status === 'SCHEDULED'
+                                                        ? 'bg-blue-100 text-blue-700'
+                                                        : 'bg-yellow-100 text-yellow-800'
                                                     }`}
                                             >
                                                 {job.status.replace('_', ' ')}
