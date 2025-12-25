@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Doorway Detail",
-  description: "Detail Done Flawlessly - Window Cleaning, Weed Removal, Gutter Cleaning",
+  title: "Doorway Detail | Premium Exterior Cleaning in Oakville",
+  description: "Expert window cleaning, pressure washing, and gutter detailing. Get an instant quote for your home today.",
+  themeColor: "#D4AF37",
 };
 
 export default function RootLayout({
