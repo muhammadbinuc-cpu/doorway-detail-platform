@@ -1,45 +1,72 @@
 "use client";
 
-import { useState } from 'react';
+// import { useState } from 'react'; // Removed
 import { Sparkles, Sprout, CloudRain, Phone, Mail } from 'lucide-react';
 import Link from 'next/link';
-import QuoteModal from '@/components/QuoteModal';
+// import QuoteModal from '@/components/QuoteModal'; // Removed
 
 export default function Home() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [isModalOpen, setIsModalOpen] = useState(false); // Removed
 
   return (
     <div className="flex flex-col min-h-screen font-sans bg-white">
-      <QuoteModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      {/* Sticky Navbar */}
+      <nav className="fixed top-0 w-full z-50 backdrop-blur-md bg-black/80 border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <Link href="/" className="text-2xl font-bold italic text-white tracking-tighter">
+                Doorway <span className="text-[#D4AF37]">Detail</span>
+              </Link>
+            </div>
+
+            {/* Desktop Links */}
+            <div className="hidden md:block">
+              <div className="ml-10 flex items-baseline space-x-8">
+                <Link href="#services" className="text-gray-300 hover:text-[#D4AF37] px-3 py-2 rounded-md text-sm font-medium transition-colors">Services</Link>
+                <Link href="#about" className="text-gray-300 hover:text-[#D4AF37] px-3 py-2 rounded-md text-sm font-medium transition-colors">About</Link>
+                <Link href="/login" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">Staff Login</Link>
+              </div>
+            </div>
+
+            {/* CTA Button */}
+            <div className="hidden md:block">
+              <Link href="/quote" className="bg-[#D4AF37] text-black px-6 py-2.5 rounded-full font-bold hover:bg-white transition-all transform hover:scale-105 shadow-lg shadow-gold/20">
+                Get Instant Quote
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {/* Hero Section */}
-      <section className="relative flex flex-col items-center justify-center py-24 text-center bg-black text-white px-4 sm:px-6 lg:px-8 overflow-hidden">
+      <section className="relative flex flex-col items-center justify-center min-h-screen text-center bg-black text-white px-4 sm:px-6 lg:px-8 overflow-hidden pt-20">
 
         {/* Decorative elements to mimic the clean detail look */}
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-gold/50 to-transparent opacity-50"></div>
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[#D4AF37]/50 to-transparent opacity-50"></div>
 
-        <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center">
+        <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center animate-fade-in-up">
           {/* Logo/Title Representation */}
           <div className="mb-6 flex flex-col items-center">
-            {/* Assuming a simple icon construction for the logo feel if no image provided, 
-                    but text-based is safer. Using the "Roof" motif from flyer could be done with SVG but text is requested. */}
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight uppercase leading-tight">
+            <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight uppercase leading-tight">
               DOORWAY <br className="sm:hidden" />
-              <span className="text-gold">DETAIL</span>
+              <span className="text-[#D4AF37]">DETAIL</span>
             </h1>
-            <div className="w-24 h-1 bg-gold mt-4 rounded-full"></div>
+            <div className="w-32 h-1.5 bg-[#D4AF37] mt-6 rounded-full"></div>
           </div>
 
-          <p className="text-xl md:text-2xl text-gray-300 mb-10 font-medium tracking-wide">
+          <p className="text-xl md:text-2xl text-gray-300 mb-12 font-medium tracking-wide max-w-2xl">
             Detail Done Flawlessly
           </p>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold uppercase tracking-wider text-black bg-gold rounded-full overflow-hidden transition-transform active:scale-95 hover:shadow-[0_0_20px_rgba(212,175,55,0.5)]"
+          <Link
+            href="/quote"
+            className="group relative inline-flex items-center justify-center px-10 py-5 text-xl font-bold uppercase tracking-wider text-black bg-[#D4AF37] rounded-full overflow-hidden transition-transform active:scale-95 hover:shadow-[0_0_30px_rgba(212,175,55,0.4)]"
           >
             <span className="relative z-10">Get Instant Quote</span>
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
-          </button>
+          </Link>
         </div>
       </section>
 
