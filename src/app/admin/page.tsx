@@ -9,10 +9,12 @@ import {
     collection, onSnapshot, query, doc, updateDoc, deleteDoc, orderBy, serverTimestamp
 } from "firebase/firestore";
 import {
-    Loader2, CheckCircle, MapPin, Phone, User, LogOut, Calendar, Trash2, FileText, TrendingUp
+    Loader2, CheckCircle, MapPin, Phone, User, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X
 } from "lucide-react";
-// Import Recharts safely
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import Link from "next/link";
+
+import { confirmBooking } from "../actions";
 
 interface Job {
     id: string;
@@ -23,17 +25,28 @@ interface Job {
     status: 'LEAD_RECEIVED' | 'SCHEDULED' | 'COMPLETED';
     createdAt: any;
     price?: number;
+    discount?: number;
+    taxRate?: number;
+    invoiceNotes?: string;
 }
 
 export default function AdminPage() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
-    const [mounted, setMounted] = useState(false); // <--- FIX FOR VERCEL BUILD
+    const [mounted, setMounted] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [editingJob, setEditingJob] = useState<Job | null>(null);
+    const [editForm, setEditForm] = useState({ discount: 0, taxRate: 13, invoiceNotes: "" });
+    const [syncingJobId, setSyncingJobId] = useState<string | null>(null);
+    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+    const [schedulingJobId, setSchedulingJobId] = useState<string | null>(null);
+    const [scheduleDate, setScheduleDate] = useState("");
+    const [syncError, setSyncError] = useState<string | null>(null);
     const router = useRouter();
 
     useEffect(() => {
-        setMounted(true); // Only allow charts after mount
+        setMounted(true);
         const unsubscribe = onAuthStateChanged(auth, (u) => {
             if (u) {
                 setUser(u);
@@ -47,19 +60,18 @@ export default function AdminPage() {
         return () => unsubscribe();
     }, [router]);
 
-    // CALCULATE METRICS
     const totalRevenue = jobs.reduce((acc, job) => acc + (job.status === 'COMPLETED' ? (job.price || 0) : 0), 0);
     const potentialRevenue = jobs.reduce((acc, job) => acc + (job.price || 0), 0);
     const activeJobs = jobs.filter(j => j.status !== 'COMPLETED').length;
 
     const chartData = [
-        { name: 'Leads', amount: jobs.filter(j => j.status === 'LEAD_RECEIVED').length * 150 }, // Est value
+        { name: 'Leads', amount: jobs.filter(j => j.status === 'LEAD_RECEIVED').length * 150 },
         { name: 'Scheduled', amount: jobs.filter(j => j.status === 'SCHEDULED').reduce((acc, j) => acc + (j.price || 0), 0) },
         { name: 'Completed', amount: totalRevenue },
     ];
 
     const handleDelete = async (id: string) => {
-        if (confirm("Delete this?")) await deleteDoc(doc(db, "jobs", id));
+        if (confirm("Delete this job?")) await deleteDoc(doc(db, "jobs", id));
     };
 
     const handleStatusUpdate = async (id: string, status: string) => {
@@ -75,17 +87,23 @@ export default function AdminPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans text-black">
-            <aside className="w-full md:w-64 bg-black/90 backdrop-blur-xl border-r border-white/10 text-white p-6">
+            <aside className="w-full md:w-64 bg-black/90 backdrop-blur-xl border-r border-white/10 text-white p-6 flex flex-col">
                 <h1 className="text-2xl font-black italic mb-8">DOORWAY <span className="text-[#D4AF37]">DETAIL</span></h1>
-                <div className="space-y-4">
-                    <div className="bg-white/10 text-[#D4AF37] px-4 py-3 rounded-xl font-bold flex items-center gap-3"><User size={20} /> Dashboard</div>
-                </div>
-                <button onClick={() => signOut(auth)} className="mt-20 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"><LogOut size={16} /> Sign Out</button>
+                <nav className="space-y-2 flex-1">
+                    <div className="bg-white/10 text-[#D4AF37] px-4 py-3 rounded-xl font-bold flex items-center gap-3">
+                        <LayoutDashboard size={20} /> Dashboard
+                    </div>
+                    <Link href="/admin/clients" className="text-gray-400 hover:text-white hover:bg-white/5 px-4 py-3 rounded-xl font-bold flex items-center gap-3 transition-all block">
+                        <Users size={20} /> Clients
+                    </Link>
+                </nav>
+                <button onClick={() => signOut(auth)} className="text-gray-400 hover:text-white flex items-center gap-2 transition-colors mt-8">
+                    <LogOut size={16} /> Sign Out
+                </button>
             </aside>
 
             <main className="flex-1 p-6 md:p-10 overflow-auto">
                 <div className="max-w-6xl mx-auto">
-                    {/* KPI CARDS */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                             <h3 className="text-gray-400 text-xs font-bold uppercase">Active Jobs</h3>
@@ -101,7 +119,6 @@ export default function AdminPage() {
                         </div>
                     </div>
 
-                    {/* CHART SECTION (Protected by mounted check) */}
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-8 h-80">
                         <h3 className="font-bold flex items-center gap-2 mb-4"><TrendingUp size={16} /> Revenue Overview</h3>
                         {mounted ? (
@@ -119,7 +136,6 @@ export default function AdminPage() {
                         ) : <div className="h-full w-full bg-gray-50 animate-pulse rounded-xl"></div>}
                     </div>
 
-                    {/* JOB LIST */}
                     <AnimatePresence mode="popLayout">
                         <div className="grid gap-6">
                             {jobs.map((job) => (
@@ -135,7 +151,18 @@ export default function AdminPage() {
                                     <div className="space-y-2 flex-1">
                                         <div className="flex items-center gap-3">
                                             <h3 className="text-xl font-bold">{job.name || 'Unknown'}</h3>
-                                            <span className={`px-2 py-1 text-xs font-bold rounded ${job.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>{job.status}</span>
+                                            <select
+                                                value={job.status}
+                                                onChange={async (e) => {
+                                                    const { updateJobStatus } = await import('../actions');
+                                                    await updateJobStatus(job.id, e.target.value);
+                                                }}
+                                                className="px-3 py-1 text-xs font-bold rounded bg-gray-100 border-none outline-none cursor-pointer hover:bg-gray-200 transition-colors"
+                                            >
+                                                <option value="LEAD_RECEIVED">LEAD_RECEIVED</option>
+                                                <option value="SCHEDULED">SCHEDULED</option>
+                                                <option value="COMPLETED">COMPLETED</option>
+                                            </select>
                                         </div>
                                         <div className="text-sm text-gray-500 flex gap-4">
                                             <span className="flex items-center gap-1"><MapPin size={14} /> {job.address}</span>
@@ -144,11 +171,49 @@ export default function AdminPage() {
                                         <div className="flex items-center gap-2 mt-2 bg-gray-50 p-2 rounded w-fit">
                                             <span className="font-bold text-gray-400">$</span>
                                             <input type="number" defaultValue={job.price} onBlur={(e) => handlePrice(job.id, e.target.value)} className="bg-transparent font-bold w-20 outline-none" />
-                                            {job.price && <a href={`/invoice/${job.id}`} target="_blank" className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline"><FileText size={12} /> Invoice</a>}
+                                            {job.price && (
+                                                <div className="flex items-center gap-2 border-l pl-2 border-gray-300">
+                                                    <a href={`/invoice/${job.id}`} target="_blank" className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline">
+                                                        <FileText size={12} /> Invoice
+                                                    </a>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingJob(job);
+                                                            setEditForm({
+                                                                discount: job.discount || 0,
+                                                                taxRate: job.taxRate || 13,
+                                                                invoiceNotes: job.invoiceNotes || ""
+                                                            });
+                                                            setShowSettingsModal(true);
+                                                        }}
+                                                        className="text-gray-400 hover:text-black transition-colors"
+                                                    >
+                                                        <Settings size={12} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-2 justify-center border-l pl-6">
-                                        {job.status === 'LEAD_RECEIVED' && <button onClick={() => handleStatusUpdate(job.id, 'SCHEDULED')} className="bg-black text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-[#D4AF37] hover:text-black transition-all">Schedule</button>}
+                                        {job.status === 'LEAD_RECEIVED' && (
+                                            <button
+                                                onClick={() => {
+                                                    setSchedulingJobId(job.id);
+                                                    setIsScheduleModalOpen(true);
+                                                }}
+                                                disabled={syncingJobId === job.id}
+                                                className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#D4AF37] hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {syncingJobId === job.id ? (
+                                                    <span className="flex items-center gap-2">
+                                                        <Loader2 className="animate-spin" size={14} /> Syncing...
+                                                    </span>
+                                                ) : (
+                                                    "Schedule"
+                                                )}
+                                            </button>
+                                        )}
                                         {job.status === 'SCHEDULED' && <button onClick={() => handleStatusUpdate(job.id, 'COMPLETED')} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 transition-all">Complete</button>}
                                         <button onClick={() => handleDelete(job.id)} className="bg-red-50 text-red-500 px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-all"><Trash2 size={14} /> Delete</button>
                                     </div>
@@ -158,6 +223,139 @@ export default function AdminPage() {
                     </AnimatePresence>
                 </div>
             </main>
+
+            {/* INVOICE SETTINGS MODAL */}
+            {showSettingsModal && editingJob && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+                    >
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-xl">Invoice Settings</h3>
+                            <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-black"><X size={24} /></button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Discount Amount ($)</label>
+                                <input
+                                    type="number"
+                                    value={editForm.discount}
+                                    onChange={(e) => setEditForm({ ...editForm, discount: parseFloat(e.target.value) })}
+                                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tax Rate (%)</label>
+                                <input
+                                    type="number"
+                                    value={editForm.taxRate}
+                                    onChange={(e) => setEditForm({ ...editForm, taxRate: parseFloat(e.target.value) })}
+                                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Invoice Notes</label>
+                                <textarea
+                                    value={editForm.invoiceNotes}
+                                    onChange={(e) => setEditForm({ ...editForm, invoiceNotes: e.target.value })}
+                                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] resize-none h-24"
+                                    placeholder="Thank you for your business..."
+                                />
+                            </div>
+
+                            <button
+                                onClick={async () => {
+                                    await updateDoc(doc(db, "jobs", editingJob.id), {
+                                        discount: editForm.discount,
+                                        taxRate: editForm.taxRate,
+                                        invoiceNotes: editForm.invoiceNotes
+                                    });
+                                    setShowSettingsModal(false);
+                                }}
+                                className="w-full bg-black text-white p-4 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-all mt-4"
+                            >
+                                Save Settings
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
+            {/* SCHEDULE MODAL */}
+            {isScheduleModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center"
+                    >
+                        <h3 className="font-black text-xl mb-4">Schedule Appointment</h3>
+                        <p className="text-gray-500 text-sm mb-6">Select a date and time to confirm this booking and sync with Google Calendar.</p>
+
+                        <input
+                            type="datetime-local"
+                            className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none ring-1 ring-gray-200 focus:ring-[#D4AF37] mb-6"
+                            onChange={(e) => {
+                                setScheduleDate(e.target.value);
+                                setSyncError(null); // Clear error on change
+                            }}
+                        />
+
+                        {syncError && (
+                            <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold mb-6">
+                                ⚠️ {syncError}
+                            </div>
+                        )}
+
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => {
+                                    setIsScheduleModalOpen(false);
+                                    setSyncError(null);
+                                }}
+                                className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (schedulingJobId && scheduleDate) {
+                                        setSyncingJobId(schedulingJobId);
+                                        setSyncError(null);
+
+                                        // Call Server Action
+                                        const result = await confirmBooking(schedulingJobId, scheduleDate);
+                                        setSyncingJobId(null);
+
+                                        if (result.success) {
+                                            alert("✅ Service Scheduled & Synced!");
+                                            setIsScheduleModalOpen(false);
+                                        } else {
+                                            // SHOW ERROR IN MODAL, DO NOT CLOSE
+                                            setSyncError(result.error);
+                                        }
+                                    } else {
+                                        alert("Please select a valid date.");
+                                    }
+                                }}
+                                disabled={!!syncingJobId}
+                                className="flex-1 bg-black text-white py-3 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-colors disabled:opacity-50"
+                            >
+                                {syncingJobId ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <Loader2 className="animate-spin" size={16} /> Syncing...
+                                    </span>
+                                ) : (
+                                    "Confirm Booking"
+                                )}
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 }
