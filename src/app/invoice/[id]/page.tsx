@@ -11,7 +11,11 @@ interface JobData {
     service: string;
     address: string;
     phone: string;
+    email?: string;
     price?: number;
+    discount?: number;
+    taxRate?: number;
+    invoiceNotes?: string;
     createdAt: any;
 }
 
@@ -68,17 +72,31 @@ export default function InvoicePage() {
         : new Date().toLocaleDateString();
 
     const subtotal = job.price || 0;
-    const tax = subtotal * 0.13; // 13% HST for Ontario
-    const total = subtotal + tax;
+    const discount = job.discount || 0;
+    const taxRate = job.taxRate !== undefined ? job.taxRate : 13;
+    const taxableAmount = subtotal - discount;
+    const tax = taxableAmount * (taxRate / 100);
+    const total = taxableAmount + tax;
+
+    const emailSubject = encodeURIComponent(`Invoice from Doorway Detail: ${job.service}`);
+    const emailBody = encodeURIComponent(`Hi ${job.name},\n\nHere is your invoice for the recent ${job.service} service.\n\nTotal Due: $${total.toFixed(2)}\n\nYou can view and print your invoice here: ${typeof window !== 'undefined' ? window.location.href : ''}\n\nThank you for your business!\n\nDoorway Detail`);
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 font-sans">
             <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
-                {/* Print Button (hidden on print) */}
+                {/* Actions Toolbar */}
                 <div className="bg-black p-4 flex justify-end gap-4 print:hidden">
+                    {job.email && (
+                        <a
+                            href={`mailto:${job.email}?subject=${emailSubject}&body=${emailBody}`}
+                            className="bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition-all flex items-center gap-2"
+                        >
+                            📧 Email to Client
+                        </a>
+                    )}
                     <button
                         onClick={handlePrint}
-                        className="bg-[#D4AF37] text-black px-6 py-2 rounded-lg font-bold hover:bg-white transition-all flex items-center gap-2"
+                        className="bg-[#D4AF37] text-black px-6 py-2 rounded-lg font-bold hover:bg-[#b5952f] transition-all flex items-center gap-2"
                     >
                         <Printer size={18} /> Print Invoice
                     </button>
@@ -112,6 +130,7 @@ export default function InvoicePage() {
                             <p className="font-bold text-gray-900 text-lg">{job.name}</p>
                             <p className="text-gray-600 mt-1">{job.address}</p>
                             <p className="text-gray-600">{job.phone}</p>
+                            <p className="text-gray-600">{job.email}</p>
                         </div>
                     </div>
 
@@ -151,12 +170,18 @@ export default function InvoicePage() {
                                 <span className="text-gray-600">Subtotal:</span>
                                 <span className="font-bold text-gray-900">${subtotal.toFixed(2)}</span>
                             </div>
+                            {discount > 0 && (
+                                <div className="flex justify-between py-3 border-b border-gray-200 text-red-600">
+                                    <span className="font-bold">Discount:</span>
+                                    <span className="font-bold">-${discount.toFixed(2)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between py-3 border-b border-gray-200">
-                                <span className="text-gray-600">HST (13%):</span>
+                                <span className="text-gray-600">Tax ({taxRate}%):</span>
                                 <span className="font-bold text-gray-900">${tax.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between py-4 bg-[#D4AF37] px-4 rounded-lg mt-2">
-                                <span className="font-bold text-black text-lg">Total:</span>
+                                <span className="font-bold text-black text-lg">Total Due:</span>
                                 <span className="font-bold text-black text-2xl">${total.toFixed(2)}</span>
                             </div>
                         </div>
@@ -164,6 +189,9 @@ export default function InvoicePage() {
 
                     {/* Footer */}
                     <div className="border-t-2 border-gray-200 pt-8 text-center">
+                        {job.invoiceNotes && (
+                            <p className="text-black font-bold mb-4 whitespace-pre-wrap">{job.invoiceNotes}</p>
+                        )}
                         <p className="text-gray-600 text-sm">
                             Thank you for choosing Doorway Detail for your exterior cleaning needs.
                         </p>
