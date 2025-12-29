@@ -65,7 +65,6 @@ export async function createClient(clientData: any) {
 }
 
 // --- JOBS ---
-// ✅ RESTORED: The missing function to create jobs
 export async function createJobFromClient(clientId: string) {
     try {
         const client = (await adminDb.collection("clients").doc(clientId).get()).data();
@@ -125,7 +124,6 @@ export async function confirmBooking(jobId: string, date: string) {
     } catch (e: any) { return { success: false, error: e.message }; }
 }
 
-// ✅ NEW: Handles Price, Discount, Tax updates
 export async function updateJobDetails(jobId: string, data: any) {
     try {
         await adminDb.collection("jobs").doc(jobId).update({ ...data, lastUpdated: Timestamp.now() });
@@ -133,6 +131,7 @@ export async function updateJobDetails(jobId: string, data: any) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
+// 🎨 UPDATED: Premium Invoice Email (Matches Dashboard Style)
 export async function emailInvoice(jobId: string) {
     try {
         if (!resend) throw new Error("CRITICAL: RESEND_API_KEY is missing.");
@@ -140,7 +139,7 @@ export async function emailInvoice(jobId: string) {
         const job = (await jobRef.get()).data();
         if (!job?.email) throw new Error("No email found");
 
-        // 🧮 MATH LOGIC: Calculates Total before sending
+        // 🧮 MATH LOGIC
         const price = job.price || 0;
         const discount = job.discount || 0;
         const subtotal = price - discount;
@@ -148,23 +147,84 @@ export async function emailInvoice(jobId: string) {
         const taxAmount = subtotal * (taxRate / 100);
         const total = subtotal + taxAmount;
 
+        // 🎨 STYLES (Inline CSS for Email Compatibility)
+        const gold = "#D4AF37";
+        const black = "#000000";
+
+        // DEMO HACK: Forces email to go to YOU, regardless of client email
         await resend.emails.send({
             from: 'DoorWay Detail <onboarding@resend.dev>',
-            to: [job.email],
+            to: 'muhammadbinuc@gmail.com', // <--- HARDCODED FOR INTERVIEW DEMO
             subject: `Invoice from DoorWay Detail`,
             html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h1>Invoice</h1>
-                    <p>Hi ${job.name},</p>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding:8px;border-bottom:1px solid #ddd;">Service</td><td style="text-align:right;">$${price.toFixed(2)}</td></tr>
-                        <tr><td style="padding:8px;border-bottom:1px solid #ddd;color:red;">Discount</td><td style="text-align:right;color:red;">-$${discount.toFixed(2)}</td></tr>
-                        <tr><td style="padding:8px;border-bottom:1px solid #ddd;">Tax (${taxRate}%)</td><td style="text-align:right;">$${taxAmount.toFixed(2)}</td></tr>
-                        <tr><td style="padding:8px;font-weight:bold;">TOTAL</td><td style="text-align:right;font-weight:bold;">$${total.toFixed(2)}</td></tr>
-                    </table>
-                    <p style="margin-top:20px;font-style:italic;">"${job.invoiceNotes || ''}"</p>
-                    <p style="margin-top:20px;"><a href="https://doorway-detail-platform.vercel.app/invoice/${jobId}">Pay Now</a></p>
-                </div>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+                        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+                        .header { background-color: ${black}; padding: 40px 30px; text-align: left; }
+                        .brand { color: #ffffff; font-size: 28px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+                        .brand-gold { color: ${gold}; font-style: italic; }
+                        .slogan { color: #cccccc; font-size: 14px; margin-top: 8px; font-weight: 300; }
+                        .content { padding: 40px 30px; color: #333333; }
+                        .invoice-title { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: ${black}; border-bottom: 2px solid ${gold}; padding-bottom: 10px; display: inline-block; }
+                        .invoice-details { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        .invoice-details td { padding: 15px 0; border-bottom: 1px solid #eeeeee; font-size: 16px; }
+                        .total-row td { border-top: 2px solid ${black}; border-bottom: none; font-weight: 800; font-size: 20px; padding-top: 20px; }
+                        .button-container { text-align: center; margin-top: 40px; }
+                        .button { display: inline-block; background-color: ${black}; color: ${gold}; padding: 18px 40px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; letter-spacing: 0.5px; }
+                        .footer { background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #888888; border-top: 1px solid #eeeeee; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <div class="brand">DOORWAY <span class="brand-gold">DETAIL</span></div>
+                            <div class="slogan">Detail Done Flawlessly</div>
+                        </div>
+
+                        <div class="content">
+                            <div class="invoice-title">INVOICE</div>
+                            <p>Hi ${job.name},</p>
+                            <p style="line-height: 1.6;">Thank you for your business. Please find your invoice details below.</p>
+                            
+                            <p style="background-color: #fff3cd; color: #856404; padding: 12px; border-radius: 4px; font-size: 13px; margin: 20px 0;">
+                                <strong>Demo Note:</strong> Original Recipient: ${job.email}. Rerouted to Admin.
+                            </p>
+
+                            <table class="invoice-details">
+                                <tr>
+                                    <td><strong>Service</strong><br><span style="font-size:14px; color:#666;">Window Cleaning</span></td>
+                                    <td style="text-align: right;">$${price.toFixed(2)}</td>
+                                </tr>
+                                ${discount > 0 ? `
+                                <tr>
+                                    <td style="color: #d9534f;">Discount</td>
+                                    <td style="text-align: right; color: #d9534f;">-$${discount.toFixed(2)}</td>
+                                </tr>` : ''}
+                                <tr>
+                                    <td>Tax (${taxRate}%)</td>
+                                    <td style="text-align: right;">$${taxAmount.toFixed(2)}</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td>TOTAL DUE</td>
+                                    <td style="text-align: right;">$${total.toFixed(2)}</td>
+                                </tr>
+                            </table>
+
+                            <div class="button-container">
+                                <a href="https://doorway-detail-platform.vercel.app/invoice/${jobId}" class="button">PAY INVOICE NOW</a>
+                            </div>
+                        </div>
+
+                        <div class="footer">
+                            <p>DoorWay Detail | 289-772-5757 | doorwaydetail@gmail.com</p>
+                            <p>&copy; ${new Date().getFullYear()} DoorWay Detail. All rights reserved.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
             `
         });
         await jobRef.update({ status: 'INVOICED', lastUpdated: Timestamp.now() });
