@@ -5,16 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import {
-    collection, onSnapshot, query, doc, updateDoc, deleteDoc, orderBy, serverTimestamp
-} from "firebase/firestore";
-import {
-    Loader2, CheckCircle, MapPin, Phone, User, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X
-} from "lucide-react";
+import { collection, onSnapshot, query, doc, deleteDoc, orderBy } from "firebase/firestore";
+import { Loader2, MapPin, Phone, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Link from "next/link";
-
-import { confirmBooking } from "../actions";
+// IMPORT ACTIONS
+import { confirmBooking, updateJobStatus, emailInvoice, updateJobDetails } from "../actions";
 
 interface Job {
     id: string;
@@ -22,7 +18,7 @@ interface Job {
     service: string;
     address: string;
     phone: string;
-    status: 'LEAD_RECEIVED' | 'SCHEDULED' | 'COMPLETED';
+    status: 'LEAD_RECEIVED' | 'SCHEDULED' | 'COMPLETED' | 'INVOICED' | 'PAID';
     createdAt: any;
     price?: number;
     discount?: number;
@@ -45,24 +41,45 @@ export default function AdminPage() {
     const [syncError, setSyncError] = useState<string | null>(null);
     const router = useRouter();
 
+    // ✅ FIXED useEffect: Prevents Permission Errors on Logout
     useEffect(() => {
         setMounted(true);
-        const unsubscribe = onAuthStateChanged(auth, (u) => {
+        let unsubscribeSnapshot: (() => void) | null = null; // Helper to track the listener
+
+        const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
             if (u) {
                 setUser(u);
                 const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
-                onSnapshot(q, (snap) => {
+
+                // Assign the listener to our variable
+                unsubscribeSnapshot = onSnapshot(q, (snap) => {
                     setJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
                     setLoading(false);
+                }, (error) => {
+                    // Ignore permission errors if they happen during logout
+                    if (error.code !== "permission-denied") {
+                        console.error("Firestore Error:", error);
+                    }
                 });
-            } else { router.push("/login"); }
+            } else {
+                // CRITICAL: Unsubscribe BEFORE redirecting to avoid permission error
+                if (unsubscribeSnapshot) {
+                    unsubscribeSnapshot();
+                    unsubscribeSnapshot = null;
+                }
+                router.push("/login");
+            }
         });
-        return () => unsubscribe();
+
+        return () => {
+            if (unsubscribeSnapshot) unsubscribeSnapshot();
+            unsubscribeAuth();
+        };
     }, [router]);
 
-    const totalRevenue = jobs.reduce((acc, job) => acc + (job.status === 'COMPLETED' ? (job.price || 0) : 0), 0);
+    const totalRevenue = jobs.reduce((acc, job) => acc + (job.status === 'COMPLETED' || job.status === 'PAID' ? (job.price || 0) : 0), 0);
     const potentialRevenue = jobs.reduce((acc, job) => acc + (job.price || 0), 0);
-    const activeJobs = jobs.filter(j => j.status !== 'COMPLETED').length;
+    const activeJobs = jobs.filter(j => j.status !== 'COMPLETED' && j.status !== 'PAID').length;
 
     const chartData = [
         { name: 'Leads', amount: jobs.filter(j => j.status === 'LEAD_RECEIVED').length * 150 },
@@ -74,12 +91,23 @@ export default function AdminPage() {
         if (confirm("Delete this job?")) await deleteDoc(doc(db, "jobs", id));
     };
 
+    // ✅ CONNECTED TO SERVER ACTION (FSM)
     const handleStatusUpdate = async (id: string, status: string) => {
-        await updateDoc(doc(db, "jobs", id), { status, lastUpdated: serverTimestamp() });
+        const res = await updateJobStatus(id, status);
+        if (!res.success) alert("FSM Error: " + res.error);
     };
 
+    // ✅ CONNECTED TO SERVER ACTION (Updates Price)
     const handlePrice = async (id: string, val: string) => {
-        await updateDoc(doc(db, "jobs", id), { price: parseFloat(val) });
+        await updateJobDetails(id, { price: parseFloat(val) });
+    };
+
+    // ✅ NEW: Handles sending invoices via Resend
+    const handleSendInvoice = async (id: string) => {
+        if (!confirm("Send Invoice Email?")) return;
+        const res = await emailInvoice(id);
+        if (res.success) alert("✅ Invoice Sent!");
+        else alert("Error: " + res.error);
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
@@ -153,14 +181,13 @@ export default function AdminPage() {
                                             <h3 className="text-xl font-bold">{job.name || 'Unknown'}</h3>
                                             <select
                                                 value={job.status}
-                                                onChange={async (e) => {
-                                                    const { updateJobStatus } = await import('../actions');
-                                                    await updateJobStatus(job.id, e.target.value);
-                                                }}
+                                                onChange={(e) => handleStatusUpdate(job.id, e.target.value)}
                                                 className="px-3 py-1 text-xs font-bold rounded bg-gray-100 border-none outline-none cursor-pointer hover:bg-gray-200 transition-colors"
                                             >
                                                 <option value="LEAD_RECEIVED">LEAD_RECEIVED</option>
                                                 <option value="SCHEDULED">SCHEDULED</option>
+                                                <option value="INVOICED">INVOICED</option>
+                                                <option value="PAID">PAID</option>
                                                 <option value="COMPLETED">COMPLETED</option>
                                             </select>
                                         </div>
@@ -174,8 +201,12 @@ export default function AdminPage() {
                                             {job.price && (
                                                 <div className="flex items-center gap-2 border-l pl-2 border-gray-300">
                                                     <a href={`/invoice/${job.id}`} target="_blank" className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline">
-                                                        <FileText size={12} /> Invoice
+                                                        <FileText size={12} /> View
                                                     </a>
+                                                    {/* NEW: Send Invoice Button */}
+                                                    <button onClick={() => handleSendInvoice(job.id)} className="text-blue-500 text-xs font-bold hover:underline">
+                                                        Send
+                                                    </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -238,37 +269,14 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Discount Amount ($)</label>
-                                <input
-                                    type="number"
-                                    value={editForm.discount}
-                                    onChange={(e) => setEditForm({ ...editForm, discount: parseFloat(e.target.value) })}
-                                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tax Rate (%)</label>
-                                <input
-                                    type="number"
-                                    value={editForm.taxRate}
-                                    onChange={(e) => setEditForm({ ...editForm, taxRate: parseFloat(e.target.value) })}
-                                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Invoice Notes</label>
-                                <textarea
-                                    value={editForm.invoiceNotes}
-                                    onChange={(e) => setEditForm({ ...editForm, invoiceNotes: e.target.value })}
-                                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] resize-none h-24"
-                                    placeholder="Thank you for your business..."
-                                />
-                            </div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Discount Amount ($)</label><input type="number" value={editForm.discount} onChange={(e) => setEditForm({ ...editForm, discount: parseFloat(e.target.value) })} className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]" /></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tax Rate (%)</label><input type="number" value={editForm.taxRate} onChange={(e) => setEditForm({ ...editForm, taxRate: parseFloat(e.target.value) })} className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]" /></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Invoice Notes</label><textarea value={editForm.invoiceNotes} onChange={(e) => setEditForm({ ...editForm, invoiceNotes: e.target.value })} className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] resize-none h-24" placeholder="Thank you for your business..." /></div>
 
                             <button
                                 onClick={async () => {
-                                    await updateDoc(doc(db, "jobs", editingJob.id), {
+                                    // ✅ CONNECTED TO SERVER ACTION
+                                    await updateJobDetails(editingJob.id, {
                                         discount: editForm.discount,
                                         taxRate: editForm.taxRate,
                                         invoiceNotes: editForm.invoiceNotes
@@ -300,33 +308,20 @@ export default function AdminPage() {
                             className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none ring-1 ring-gray-200 focus:ring-[#D4AF37] mb-6"
                             onChange={(e) => {
                                 setScheduleDate(e.target.value);
-                                setSyncError(null); // Clear error on change
+                                setSyncError(null);
                             }}
                         />
 
-                        {syncError && (
-                            <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold mb-6">
-                                ⚠️ {syncError}
-                            </div>
-                        )}
+                        {syncError && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold mb-6">⚠️ {syncError}</div>}
 
                         <div className="flex gap-4">
-                            <button
-                                onClick={() => {
-                                    setIsScheduleModalOpen(false);
-                                    setSyncError(null);
-                                }}
-                                className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
-                            >
-                                Cancel
-                            </button>
+                            <button onClick={() => { setIsScheduleModalOpen(false); setSyncError(null); }} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">Cancel</button>
                             <button
                                 onClick={async () => {
                                     if (schedulingJobId && scheduleDate) {
                                         setSyncingJobId(schedulingJobId);
                                         setSyncError(null);
-
-                                        // Call Server Action
+                                        // ✅ SERVER ACTION
                                         const result = await confirmBooking(schedulingJobId, scheduleDate);
                                         setSyncingJobId(null);
 
@@ -334,7 +329,6 @@ export default function AdminPage() {
                                             alert("✅ Service Scheduled & Synced!");
                                             setIsScheduleModalOpen(false);
                                         } else {
-                                            // SHOW ERROR IN MODAL, DO NOT CLOSE
                                             setSyncError(result.error);
                                         }
                                     } else {
@@ -344,13 +338,7 @@ export default function AdminPage() {
                                 disabled={!!syncingJobId}
                                 className="flex-1 bg-black text-white py-3 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-colors disabled:opacity-50"
                             >
-                                {syncingJobId ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <Loader2 className="animate-spin" size={16} /> Syncing...
-                                    </span>
-                                ) : (
-                                    "Confirm Booking"
-                                )}
+                                {syncingJobId ? <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={16} /> Syncing...</span> : "Confirm Booking"}
                             </button>
                         </div>
                     </motion.div>
