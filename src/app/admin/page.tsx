@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot, query, doc, deleteDoc, orderBy } from "firebase/firestore";
+// ✅ RESUME PROOF: Added 'limit' for optimization
+import { collection, onSnapshot, query, doc, deleteDoc, orderBy, limit } from "firebase/firestore";
 import { Loader2, MapPin, Phone, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Link from "next/link";
@@ -26,6 +27,19 @@ interface Job {
     invoiceNotes?: string;
 }
 
+// ✅ RESUME PROOF: Deterministic Finite State Machine (FSM)
+// This strictly defines allowed transitions. You cannot jump from LEAD to PAID.
+const getNextStatuses = (currentStatus: string): string[] => {
+    const transitions: Record<string, string[]> = {
+        'LEAD_RECEIVED': ['LEAD_RECEIVED', 'SCHEDULED'],
+        'SCHEDULED': ['SCHEDULED', 'COMPLETED', 'LEAD_RECEIVED'], // Allow reverting to Lead if cancelled
+        'COMPLETED': ['COMPLETED', 'INVOICED', 'SCHEDULED'],       // Allow reverting if mistake made
+        'INVOICED': ['INVOICED', 'PAID', 'COMPLETED'],             // Allow reverting to fix invoice
+        'PAID': ['PAID', 'INVOICED']                               // Allow reverting if refund needed
+    };
+    return transitions[currentStatus] || [currentStatus];
+};
+
 export default function AdminPage() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,28 +55,31 @@ export default function AdminPage() {
     const [syncError, setSyncError] = useState<string | null>(null);
     const router = useRouter();
 
-    // ✅ FIXED useEffect: Prevents Permission Errors on Logout
     useEffect(() => {
         setMounted(true);
-        let unsubscribeSnapshot: (() => void) | null = null; // Helper to track the listener
+        let unsubscribeSnapshot: (() => void) | null = null;
 
         const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
             if (u) {
                 setUser(u);
-                const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
 
-                // Assign the listener to our variable
+                // ✅ RESUME PROOF: Optimized Query
+                // We utilize 'limit(50)' to prevent over-fetching and memory bloat on the client.
+                const q = query(
+                    collection(db, "jobs"),
+                    orderBy("createdAt", "desc"),
+                    limit(50)
+                );
+
                 unsubscribeSnapshot = onSnapshot(q, (snap) => {
                     setJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
                     setLoading(false);
                 }, (error) => {
-                    // Ignore permission errors if they happen during logout
                     if (error.code !== "permission-denied") {
                         console.error("Firestore Error:", error);
                     }
                 });
             } else {
-                // CRITICAL: Unsubscribe BEFORE redirecting to avoid permission error
                 if (unsubscribeSnapshot) {
                     unsubscribeSnapshot();
                     unsubscribeSnapshot = null;
@@ -91,18 +108,15 @@ export default function AdminPage() {
         if (confirm("Delete this job?")) await deleteDoc(doc(db, "jobs", id));
     };
 
-    // ✅ CONNECTED TO SERVER ACTION (FSM)
     const handleStatusUpdate = async (id: string, status: string) => {
         const res = await updateJobStatus(id, status);
         if (!res.success) alert("FSM Error: " + res.error);
     };
 
-    // ✅ CONNECTED TO SERVER ACTION (Updates Price)
     const handlePrice = async (id: string, val: string) => {
         await updateJobDetails(id, { price: parseFloat(val) });
     };
 
-    // ✅ NEW: Handles sending invoices via Resend
     const handleSendInvoice = async (id: string) => {
         if (!confirm("Send Invoice Email?")) return;
         const res = await emailInvoice(id);
@@ -179,17 +193,18 @@ export default function AdminPage() {
                                     <div className="space-y-2 flex-1">
                                         <div className="flex items-center gap-3">
                                             <h3 className="text-xl font-bold">{job.name || 'Unknown'}</h3>
+
+                                            {/* ✅ RESUME PROOF: STRICT FSM DROPDOWN */}
                                             <select
                                                 value={job.status}
                                                 onChange={(e) => handleStatusUpdate(job.id, e.target.value)}
                                                 className="px-3 py-1 text-xs font-bold rounded bg-gray-100 border-none outline-none cursor-pointer hover:bg-gray-200 transition-colors"
                                             >
-                                                <option value="LEAD_RECEIVED">LEAD_RECEIVED</option>
-                                                <option value="SCHEDULED">SCHEDULED</option>
-                                                <option value="INVOICED">INVOICED</option>
-                                                <option value="PAID">PAID</option>
-                                                <option value="COMPLETED">COMPLETED</option>
+                                                {getNextStatuses(job.status).map((s) => (
+                                                    <option key={s} value={s}>{s}</option>
+                                                ))}
                                             </select>
+
                                         </div>
                                         <div className="text-sm text-gray-500 flex gap-4">
                                             <span className="flex items-center gap-1"><MapPin size={14} /> {job.address}</span>
@@ -203,7 +218,6 @@ export default function AdminPage() {
                                                     <a href={`/invoice/${job.id}`} target="_blank" className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline">
                                                         <FileText size={12} /> View
                                                     </a>
-                                                    {/* NEW: Send Invoice Button */}
                                                     <button onClick={() => handleSendInvoice(job.id)} className="text-blue-500 text-xs font-bold hover:underline">
                                                         Send
                                                     </button>
@@ -275,7 +289,6 @@ export default function AdminPage() {
 
                             <button
                                 onClick={async () => {
-                                    // ✅ CONNECTED TO SERVER ACTION
                                     await updateJobDetails(editingJob.id, {
                                         discount: editForm.discount,
                                         taxRate: editForm.taxRate,
@@ -321,7 +334,6 @@ export default function AdminPage() {
                                     if (schedulingJobId && scheduleDate) {
                                         setSyncingJobId(schedulingJobId);
                                         setSyncError(null);
-                                        // ✅ SERVER ACTION
                                         const result = await confirmBooking(schedulingJobId, scheduleDate);
                                         setSyncingJobId(null);
 
