@@ -29,7 +29,8 @@ const twilioClient = process.env.TWILIO_ACCOUNT_SID
 // ==========================================
 const JOB_WORKFLOW: Record<string, string[]> = {
     'LEAD_RECEIVED': ['SCHEDULED', 'LOST', 'CANCELLED'],
-    'SCHEDULED': ['INVOICED', 'CANCELLED'],
+    'SCHEDULED': ['INVOICED', 'CANCELLED', 'COMPLETED'],
+    'COMPLETED': ['INVOICED'],
     'INVOICED': ['PAID', 'UNPAID'],
     'PAID': [],     // End of lifecycle
     'LOST': [],
@@ -128,8 +129,10 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
         const validTransitions = JOB_WORKFLOW[currentStatus] || [];
 
         // FSM GUARD RAIL
+        // We allow 'SCHEDULED' as a reset, otherwise enforce the graph
         if (!validTransitions.includes(newStatus) && newStatus !== 'SCHEDULED') {
             console.warn(`⚠️ FSM WARNING: Invalid transition ${currentStatus} -> ${newStatus}`);
+            // In a strict mode, we would throw an error here.
         }
 
         await jobRef.update({ status: newStatus, lastUpdated: Timestamp.now() });
@@ -168,7 +171,7 @@ export async function confirmBooking(jobId: string, date: string) {
         try {
             await addToGoogleCalendar({
                 title: `Service: ${job.name}`,
-                description: `Phone: ${job.phone}`,
+                description: `Phone: ${job.phone}\nAddress: ${job.address}`,
                 location: job.address
             }, date);
         } catch (e) { console.error("Cal Error (Non-fatal):", e); }
