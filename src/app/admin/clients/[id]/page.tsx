@@ -8,6 +8,7 @@ import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, MapPin, Phone, Mail, Loader2 } from "lucide-react";
 import { createJobFromClient } from "../../../actions";
 
+// ✅ TASK 4: Client Profile Page with Debug Logging
 export default function ClientProfile() {
     const params = useParams();
     const id = params?.id as string;
@@ -17,16 +18,26 @@ export default function ClientProfile() {
     const [creatingJob, setCreatingJob] = useState(false);
     const router = useRouter();
 
-    useEffect(() => {
-        if (!id) return;
-        const fetchData = async () => {
-            const snap = await getDoc(doc(db, "clients", id));
-            if (snap.exists()) setClient({ id: snap.id, ...snap.data() });
+    // ✅ TASK 4: Debug logging
+    console.log("Client ID:", id);
 
-            const q = query(collection(db, "jobs"), where("clientId", "==", id), orderBy("createdAt", "desc"));
-            const jobs = await getDocs(q);
-            setHistory(jobs.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
+    useEffect(() => {
+        // ✅ TASK 4: Early return if no ID
+        if (!id) return;
+
+        const fetchData = async () => {
+            try {
+                const snap = await getDoc(doc(db, "clients", id));
+                if (snap.exists()) setClient({ id: snap.id, ...snap.data() });
+
+                const q = query(collection(db, "jobs"), where("clientId", "==", id), orderBy("createdAt", "desc"));
+                const jobs = await getDocs(q);
+                setHistory(jobs.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (error) {
+                console.error("Error fetching client data:", error);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchData();
     }, [id]);
@@ -89,8 +100,8 @@ export default function ClientProfile() {
                                 </p>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${job.status === 'PAID' ? 'bg-green-100 text-green-700' :
-                                    job.status === 'INVOICED' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-yellow-100 text-yellow-800'
+                                job.status === 'INVOICED' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-yellow-100 text-yellow-800'
                                 }`}>
                                 {job.status}
                             </span>

@@ -39,7 +39,7 @@ async function getGeocode(address: string) {
     } catch (error) { return null; }
 }
 
-// ✅ TASK 1: Secure Session Bridge
+// ✅ TASK 1: Secure Session Bridge for Firebase Auth
 export async function createSession() {
     // Set server-side cookie for middleware authentication
     (await cookies()).set('admin_session', process.env.ADMIN_SECRET!, {
@@ -160,7 +160,6 @@ export async function emailInvoice(jobId: string) {
         // Safety Layer Logging
         await ServiceLayer.logEvent('INVOICE_SENT', { jobId, email: job.email });
 
-        // 🧮 MATH LOGIC
         const price = job.price || 0;
         const discount = job.discount || 0;
         const subtotal = price - discount;
@@ -168,7 +167,6 @@ export async function emailInvoice(jobId: string) {
         const taxAmount = subtotal * (taxRate / 100);
         const total = subtotal + taxAmount;
 
-        // 🎨 STYLES (Inline CSS for Email Compatibility)
         const gold = "#D4AF37";
         const black = "#000000";
 
@@ -249,7 +247,7 @@ export async function emailInvoice(jobId: string) {
         if (job.phone && twilioClient) {
             try {
                 await twilioClient.messages.create({
-                    body: `Hi ${job.name}, your invoice for ${job.service} has been sent to your email. - DoorWay Detail`,
+                    body: `Hi ${job.name}, your DoorWay Detail invoice is ready. Please check your email.`,
                     from: process.env.TWILIO_FROM_NUMBER,
                     to: job.phone
                 });
@@ -270,7 +268,7 @@ export async function submitQuote(formData: any) {
         const emailLower = email.toLowerCase();
 
         // Safety Layer Logging
-        await ServiceLayer.logEvent('QUOTE_SUBMITTED', { email: emailLower, name, phone, service });
+        await ServiceLayer.logEvent('QUOTE_SUBMITTED', { email: emailLower });
 
         const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
         const recentJobs = await adminDb.collection("jobs")
