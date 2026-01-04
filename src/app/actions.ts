@@ -39,10 +39,11 @@ async function getGeocode(address: string) {
     } catch (error) { return null; }
 }
 
-// ✅ TASK 1: Secure Session Bridge for Firebase Auth
+// ✅ TASK 1: Secure Session Bridge (Updated to 'session_token_v2' to bust cache)
 export async function createSession() {
     // Set server-side cookie for middleware authentication
-    (await cookies()).set('admin_session', process.env.ADMIN_SECRET!, {
+    // CHANGED: 'admin_session' -> 'session_token_v2'
+    (await cookies()).set('session_token_v2', process.env.ADMIN_SECRET!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: 86400, // 1 day
@@ -55,7 +56,8 @@ export async function createSession() {
 export async function loginAdmin(formData: FormData) {
     const password = formData.get('password');
     if (password === process.env.ADMIN_SECRET) {
-        (await cookies()).set('admin_session', process.env.ADMIN_SECRET!, {
+        // CHANGED: 'admin_session' -> 'session_token_v2'
+        (await cookies()).set('session_token_v2', process.env.ADMIN_SECRET!, {
             httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 60 * 60 * 24, path: '/',
         });
         return { success: true };
@@ -149,7 +151,7 @@ export async function updateJobDetails(jobId: string, data: any) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// ✅ TASK 2 & 3: Productionize Email Invoice + Safety Layer
+// ✅ TASK 2 & 3: Productionize Email Invoice (Professional Table Layout)
 export async function emailInvoice(jobId: string) {
     try {
         if (!resend) throw new Error("CRITICAL: RESEND_API_KEY is missing.");
@@ -167,77 +169,45 @@ export async function emailInvoice(jobId: string) {
         const taxAmount = subtotal * (taxRate / 100);
         const total = subtotal + taxAmount;
 
-        const gold = "#D4AF37";
-        const black = "#000000";
-
-        // ✅ TASK 2: Use REAL client email
+        // ✅ TASK 2: Use REAL client email & Professional Table Layout
         await resend.emails.send({
             from: 'DoorWay Detail <onboarding@resend.dev>',
-            to: job.email, // ✅ Using real client email
+            to: job.email, 
             subject: `Invoice from DoorWay Detail`,
             html: `
                 <!DOCTYPE html>
                 <html>
-                <head>
-                    <style>
-                        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
-                        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-                        .header { background-color: ${black}; padding: 40px 30px; text-align: left; }
-                        .brand { color: #ffffff; font-size: 28px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-                        .brand-gold { color: ${gold}; font-style: italic; }
-                        .slogan { color: #cccccc; font-size: 14px; margin-top: 8px; font-weight: 300; }
-                        .content { padding: 40px 30px; color: #333333; }
-                        .invoice-title { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: ${black}; border-bottom: 2px solid ${gold}; padding-bottom: 10px; display: inline-block; }
-                        .invoice-details { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        .invoice-details td { padding: 15px 0; border-bottom: 1px solid #eeeeee; font-size: 16px; }
-                        .total-row td { border-top: 2px solid ${black}; border-bottom: none; font-weight: 800; font-size: 20px; padding-top: 20px; }
-                        .button-container { text-align: center; margin-top: 40px; }
-                        .button { display: inline-block; background-color: ${black}; color: ${gold}; padding: 18px 40px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; letter-spacing: 0.5px; }
-                        .footer { background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #888888; border-top: 1px solid #eeeeee; }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="header">
-                            <div class="brand">DOORWAY <span class="brand-gold">DETAIL</span></div>
-                            <div class="slogan">Detail Done Flawlessly</div>
-                        </div>
+                <body style="font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 40px 0;">
+                    <table align="center" width="600" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+                        <tr>
+                            <td style="background-color: #000000; padding: 40px; text-align: left;">
+                                <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 2px; margin: 0;">DOORWAY <span style="color: #D4AF37;">DETAIL</span></h1>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 40px;">
+                                <h2 style="margin-top: 0; color: #000000; font-size: 28px;">Invoice Ready</h2>
+                                <p style="color: #555555; font-size: 16px; line-height: 1.6;">Hi ${job.name},</p>
+                                <p style="color: #555555; font-size: 16px; line-height: 1.6;">Thanks for choosing us. Your invoice for <strong>Window Cleaning</strong> is ready.</p>
+                                
+                                <table width="100%" style="margin: 30px 0; border-collapse: collapse;">
+                                    <tr style="border-bottom: 1px solid #eeeeee;">
+                                        <td style="padding: 15px 0; color: #888888;">Amount Due</td>
+                                        <td style="padding: 15px 0; text-align: right; font-weight: bold; font-size: 18px;">$${total.toFixed(2)}</td>
+                                    </tr>
+                                </table>
 
-                        <div class="content">
-                            <div class="invoice-title">INVOICE</div>
-                            <p>Hi ${job.name},</p>
-                            <p style="line-height: 1.6;">Thank you for your business. Please find your invoice details below.</p>
-
-                            <table class="invoice-details">
-                                <tr>
-                                    <td><strong>Service</strong><br><span style="font-size:14px; color:#666;">Window Cleaning</span></td>
-                                    <td style="text-align: right;">$${price.toFixed(2)}</td>
-                                </tr>
-                                ${discount > 0 ? `
-                                <tr>
-                                    <td style="color: #d9534f;">Discount</td>
-                                    <td style="text-align: right; color: #d9534f;">-$${discount.toFixed(2)}</td>
-                                </tr>` : ''}
-                                <tr>
-                                    <td>Tax (${taxRate}%)</td>
-                                    <td style="text-align: right;">$${taxAmount.toFixed(2)}</td>
-                                </tr>
-                                <tr class="total-row">
-                                    <td>TOTAL DUE</td>
-                                    <td style="text-align: right;">$${total.toFixed(2)}</td>
-                                </tr>
-                            </table>
-
-                            <div class="button-container">
-                                <a href="https://doorway-detail-platform.vercel.app/invoice/${jobId}" class="button">PAY INVOICE NOW</a>
-                            </div>
-                        </div>
-
-                        <div class="footer">
-                            <p>DoorWay Detail | 289-772-5757 | doorwaydetail@gmail.com</p>
-                            <p>&copy; ${new Date().getFullYear()} DoorWay Detail. All rights reserved.</p>
-                        </div>
-                    </div>
+                                <div style="text-align: center; margin-top: 40px;">
+                                    <a href="https://doorway-detail-platform.vercel.app/invoice/${jobId}" style="background-color: #000000; color: #D4AF37; padding: 18px 40px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">PAY INVOICE</a>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 30px; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p style="color: #888888; font-size: 12px; margin: 0;">DoorWay Detail | Oakville, ON | 289-772-5757</p>
+                            </td>
+                        </tr>
+                    </table>
                 </body>
                 </html>
             `
