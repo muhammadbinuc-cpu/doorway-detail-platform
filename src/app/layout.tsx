@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next"; // 1. Import Viewport
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Doorway Detail | Premium Exterior Cleaning in Oakville",
   description: "Expert window cleaning, pressure washing, and gutter detailing. Get an instant quote for your home today.",
+  // ❌ themeColor removed from here
+};
+
+// 2. Add this new export for the viewport
+export const viewport: Viewport = {
   themeColor: "#D4AF37",
 };
 
