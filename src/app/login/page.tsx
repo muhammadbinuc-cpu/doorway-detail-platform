@@ -20,10 +20,10 @@ export default function LoginPage() {
         setError("");
 
         try {
-            // Step 1: Firebase Authentication (client-side)
+            // ✅ TASK 1: Step 1 - Firebase Authentication (client-side)
             await signInWithEmailAndPassword(auth, email, password);
 
-            // ✅ TASK 1: Step 2: Create server-side session (bridge for middleware)
+            // ✅ TASK 1: Step 2 - Create server-side session (bridge for middleware)
             const sessionResult = await createSession();
 
             if (!sessionResult.success) {
