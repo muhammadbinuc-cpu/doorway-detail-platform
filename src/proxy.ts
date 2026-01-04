@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  // 1. Check if user is trying to go to /admin
+// 1. Change to default export and rename function to 'proxy'
+export default function proxy(request: NextRequest) {
+  // Check if user is trying to go to /admin
   if (request.nextUrl.pathname.startsWith('/admin')) {
-    
-    // 2. Check for the secret cookie
+
     const authCookie = request.cookies.get('admin_session');
-    
-    // 3. If no cookie, kick them to the login page
+
+    // NOTE: Since you just switched to Firebase, this cookie check might need 
+    // to be updated later. For now, this keeps the file valid.
     if (!authCookie || authCookie.value !== process.env.ADMIN_SECRET) {
+      // Ideally, you'd check Firebase tokens here, but this preserves your existing logic.
+      // If you get stuck in a loop, verify you are setting the cookie on login.
       return NextResponse.redirect(new URL('/login', request.url));
     }
   }

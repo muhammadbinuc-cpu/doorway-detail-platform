@@ -6,6 +6,7 @@ import { addToGoogleCalendar } from "@/lib/google";
 import { cookies } from 'next/headers';
 import { Resend } from 'resend';
 import twilio from 'twilio';
+import { ServiceLayer } from '@/lib/services';
 
 const MOCK_GEOCODING = true;
 
@@ -36,6 +37,19 @@ async function getGeocode(address: string) {
         }
         return null;
     } catch (error) { return null; }
+}
+
+// ✅ TASK 1: Secure Session Bridge
+export async function createSession() {
+    // Set server-side cookie for middleware authentication
+    (await cookies()).set('admin_session', process.env.ADMIN_SECRET!, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 86400, // 1 day
+        path: '/',
+    });
+
+    return { success: true };
 }
 
 export async function loginAdmin(formData: FormData) {
@@ -97,8 +111,12 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
+// ✅ TASK 3: Safety Layer Integration
 export async function confirmBooking(jobId: string, date: string) {
     try {
+        // Safety Layer Logging
+        await ServiceLayer.logEvent('BOOKING_CONFIRMED', { jobId, date });
+
         const jobRef = adminDb.collection("jobs").doc(jobId);
         const job = (await jobRef.get()).data();
         if (!job) throw new Error("Job not found");
@@ -131,13 +149,16 @@ export async function updateJobDetails(jobId: string, data: any) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// 🎨 UPDATED: Premium Invoice Email (Matches Dashboard Style)
+// ✅ TASK 2 & 3: Productionize Email Invoice + Safety Layer
 export async function emailInvoice(jobId: string) {
     try {
         if (!resend) throw new Error("CRITICAL: RESEND_API_KEY is missing.");
         const jobRef = adminDb.collection("jobs").doc(jobId);
         const job = (await jobRef.get()).data();
         if (!job?.email) throw new Error("No email found");
+
+        // Safety Layer Logging
+        await ServiceLayer.logEvent('INVOICE_SENT', { jobId, email: job.email });
 
         // 🧮 MATH LOGIC
         const price = job.price || 0;
@@ -151,10 +172,10 @@ export async function emailInvoice(jobId: string) {
         const gold = "#D4AF37";
         const black = "#000000";
 
-        // DEMO HACK: Forces email to go to YOU, regardless of client email
+        // ✅ TASK 2: Use REAL client email
         await resend.emails.send({
             from: 'DoorWay Detail <onboarding@resend.dev>',
-            to: 'muhammadbinuc@gmail.com', // <--- HARDCODED FOR INTERVIEW DEMO
+            to: job.email, // ✅ Using real client email
             subject: `Invoice from DoorWay Detail`,
             html: `
                 <!DOCTYPE html>
@@ -188,10 +209,6 @@ export async function emailInvoice(jobId: string) {
                             <div class="invoice-title">INVOICE</div>
                             <p>Hi ${job.name},</p>
                             <p style="line-height: 1.6;">Thank you for your business. Please find your invoice details below.</p>
-                            
-                            <p style="background-color: #fff3cd; color: #856404; padding: 12px; border-radius: 4px; font-size: 13px; margin: 20px 0;">
-                                <strong>Demo Note:</strong> Original Recipient: ${job.email}. Rerouted to Admin.
-                            </p>
 
                             <table class="invoice-details">
                                 <tr>
@@ -227,15 +244,33 @@ export async function emailInvoice(jobId: string) {
                 </html>
             `
         });
+
+        // ✅ TASK 2: Add SMS Notification
+        if (job.phone && twilioClient) {
+            try {
+                await twilioClient.messages.create({
+                    body: `Hi ${job.name}, your invoice for ${job.service} has been sent to your email. - DoorWay Detail`,
+                    from: process.env.TWILIO_FROM_NUMBER,
+                    to: job.phone
+                });
+            } catch (e) {
+                console.error("SMS notification failed:", e);
+            }
+        }
+
         await jobRef.update({ status: 'INVOICED', lastUpdated: Timestamp.now() });
         return { success: true };
     } catch (e: any) { return { success: false, error: e.message }; }
 }
 
+// ✅ TASK 3: Safety Layer Integration
 export async function submitQuote(formData: any) {
     try {
         const { name, email, phone, address, service } = formData;
         const emailLower = email.toLowerCase();
+
+        // Safety Layer Logging
+        await ServiceLayer.logEvent('QUOTE_SUBMITTED', { email: emailLower, name, phone, service });
 
         const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
         const recentJobs = await adminDb.collection("jobs")
