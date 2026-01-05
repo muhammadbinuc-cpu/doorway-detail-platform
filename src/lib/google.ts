@@ -1,27 +1,47 @@
 import "server-only";
 import { google } from "googleapis";
 
-// 1. Setup Google Auth
-const auth = new google.auth.GoogleAuth({
-    credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    },
-    scopes: ["https://www.googleapis.com/auth/calendar"],
-});
+// 1. SAFE KEY EXTRACTION
+// We strip quotes and fix newlines, just like we did for Firebase
+const rawKey = process.env.GOOGLE_PRIVATE_KEY || "";
+const cleanKey = rawKey.replace(/['"]/g, "").replace(/\\n/g, "\n");
 
-const calendar = google.calendar({ version: "v3", auth });
+// 2. Initialize Auth (Lazy/Safe)
+const getAuth = () => {
+    // If keys are missing, throw a clear error instead of crashing blindly
+    if (!process.env.GOOGLE_CLIENT_EMAIL || !cleanKey) {
+        console.error("⚠️ GOOGLE CALENDAR WARNING: Missing credentials.");
+        return null;
+    }
 
-// 2. Function to Add Event
+    try {
+        return new google.auth.GoogleAuth({
+            credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: cleanKey,
+            },
+            scopes: ["https://www.googleapis.com/auth/calendar"],
+        });
+    } catch (e) {
+        console.error("❌ Google Auth Init Failed:", e);
+        return null;
+    }
+};
+
+// 3. Function to Add Event
 export async function addToGoogleCalendar(
     eventData: { title: string; description: string; location: string },
     date: string
 ) {
-    const calendarId = process.env.GOOGLE_CALENDAR_ID; // muhammadbinuc@gmail.com
+    const calendarId = process.env.GOOGLE_CALENDAR_ID;
+    const auth = getAuth();
 
-    if (!calendarId) {
-        throw new Error("Missing GOOGLE_CALENDAR_ID in .env");
+    if (!calendarId || !auth) {
+        console.warn("⚠️ Skipping Calendar Event: Missing ID or Auth");
+        return null; // Return null instead of crashing
     }
+
+    const calendar = google.calendar({ version: "v3", auth });
 
     // Calculate End Time (1 hour later)
     const startTime = new Date(date);
@@ -42,11 +62,8 @@ export async function addToGoogleCalendar(
         console.log("✅ Google Calendar Event Created:", response.data.htmlLink);
         return response.data;
     } catch (error: any) {
-        console.error("❌ Google Calendar Error:", error.message);
-        // Determine if it's a permission issue
-        if (error.message.includes("Writer access")) {
-            throw new Error("Bot needs 'Make changes to events' permission on your Google Calendar.");
-        }
-        throw error;
+        console.error("❌ Google Calendar API Error:", error.message);
+        // We catch the error so it doesn't crash the whole login flow
+        return null;
     }
 }
