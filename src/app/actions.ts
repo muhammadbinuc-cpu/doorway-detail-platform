@@ -11,7 +11,6 @@ import { ServiceLayer } from '@/lib/services';
 const MOCK_GEOCODING = true;
 
 // --- SAFETY CHECK: Key Sanitization ---
-// This prevents the "Server Components Render" crash if keys have extra quotes
 const sanitizeKey = (key: string | undefined) => {
     if (!key) return undefined;
     return key.replace(/['"]/g, "").replace(/\\n/g, "\n");
@@ -25,14 +24,15 @@ const twilioSid = sanitizeKey(process.env.TWILIO_ACCOUNT_SID);
 const twilioToken = sanitizeKey(process.env.TWILIO_AUTH_TOKEN);
 const twilioClient = (twilioSid && twilioToken) ? twilio(twilioSid, twilioToken) : null;
 
-// FSM Logic
+// FSM Logic - ✅ UPDATED: More flexible to prevent "Stuck" jobs
 const JOB_WORKFLOW: Record<string, string[]> = {
-    'LEAD_RECEIVED': ['SCHEDULED', 'LOST', 'CANCELLED'],
-    'SCHEDULED': ['INVOICED', 'CANCELLED', 'COMPLETED'],
-    'COMPLETED': ['INVOICED'],
-    'INVOICED': ['PAID', 'UNPAID'],
+    'LEAD_RECEIVED': ['SCHEDULED', 'LOST', 'CANCELLED', 'COMPLETED', 'INVOICED'], // Allow fast-forward
+    'SCHEDULED': ['INVOICED', 'CANCELLED', 'COMPLETED', 'LEAD_RECEIVED'], // Allow reverting
+    'COMPLETED': ['INVOICED', 'SCHEDULED'],
+    'INVOICED': ['PAID', 'UNPAID', 'COMPLETED'], // Allow going back if invoice was mistake
     'PAID': [],
-    'LOST': [], 'CANCELLED': []
+    'LOST': [],
+    'CANCELLED': []
 };
 
 async function getGeocode(address: string) {
@@ -53,7 +53,6 @@ async function getGeocode(address: string) {
 
 // ✅ TASK 1: Secure Session Bridge
 export async function createSession() {
-    // Set server-side cookie for middleware authentication
     const secret = sanitizeKey(process.env.ADMIN_SECRET);
     if (!secret) throw new Error("ADMIN_SECRET is missing in Vercel.");
 
@@ -95,6 +94,25 @@ export async function createClient(clientData: any) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
+// ✅ NEW: Delete Client
+export async function deleteClient(clientId: string) {
+    try {
+        await adminDb.collection("clients").doc(clientId).delete();
+        return { success: true };
+    } catch (error: any) { return { success: false, error: error.message }; }
+}
+
+// ✅ NEW: Update Client Notes
+export async function updateClientNotes(clientId: string, notes: string) {
+    try {
+        await adminDb.collection("clients").doc(clientId).update({
+            propertyNotes: notes,
+            lastUpdated: Timestamp.now()
+        });
+        return { success: true };
+    } catch (error: any) { return { success: false, error: error.message }; }
+}
+
 // --- JOBS ---
 export async function createJobFromClient(clientId: string) {
     try {
@@ -120,9 +138,11 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
         if (!job) throw new Error("Job not found");
 
         const validTransitions = JOB_WORKFLOW[job.status] || [];
-        if (!validTransitions.includes(newStatus) && newStatus !== 'SCHEDULED') {
-            console.warn(`⚠️ FSM WARNING: Invalid transition ${job.status} -> ${newStatus}`);
+        // Relaxed check: Only warn, but allow if it's a valid "jump"
+        if (!validTransitions.includes(newStatus)) {
+            console.warn(`⚠️ FSM WARNING: Unusual transition ${job.status} -> ${newStatus}`);
         }
+
         await jobRef.update({ status: newStatus, lastUpdated: Timestamp.now() });
         return { success: true };
     } catch (error: any) { return { success: false, error: error.message }; }
@@ -131,9 +151,7 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
 // ✅ TASK 3: Safety Layer Integration
 export async function confirmBooking(jobId: string, date: string) {
     try {
-        // Safety Layer Logging
         await ServiceLayer.logEvent('BOOKING_CONFIRMED', { jobId, date });
-
         const jobRef = adminDb.collection("jobs").doc(jobId);
         const job = (await jobRef.get()).data();
         if (!job) throw new Error("Job not found");
@@ -166,7 +184,7 @@ export async function updateJobDetails(jobId: string, data: any) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// ✅ TASK 2 & 3: Productionize Email Invoice
+// ✅ TASK 2 & 3: Productionize Email Invoice with GOLD TEMPLATE
 export async function emailInvoice(jobId: string) {
     try {
         if (!resend) throw new Error("CRITICAL: RESEND_API_KEY is missing or invalid.");
@@ -174,7 +192,6 @@ export async function emailInvoice(jobId: string) {
         const job = (await jobRef.get()).data();
         if (!job?.email) throw new Error("No email found");
 
-        // Safety Layer Logging
         await ServiceLayer.logEvent('INVOICE_SENT', { jobId, email: job.email });
 
         const price = job.price || 0;
@@ -184,12 +201,83 @@ export async function emailInvoice(jobId: string) {
         const taxAmount = subtotal * (taxRate / 100);
         const total = subtotal + taxAmount;
 
-        await resend.emails.send({
-            from: 'DoorWay Detail <onboarding@resend.dev>',
+        // ✅ THE PROFESSIONAL BLACK & GOLD TEMPLATE
+        const { data, error } = await resend.emails.send({
+            from: 'DoorWay Detail <onboarding@resend.dev>', // You must verify a domain to change this
             to: job.email,
-            subject: `Invoice from DoorWay Detail`,
-            html: `<!DOCTYPE html><html><body><h1>Invoice Ready</h1><p>Amount Due: $${total.toFixed(2)}</p><a href="https://doorway-detail-platform.vercel.app/invoice/${jobId}">Pay Now</a></body></html>`
+            subject: `Invoice #${jobId.slice(0, 6).toUpperCase()} from DoorWay Detail`,
+            html: `
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 40px 0;">
+                    <table align="center" width="600" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin: 0 auto;">
+                        <tr>
+                            <td style="background-color: #000000; padding: 40px; text-align: center;">
+                                <h1 style="color: #ffffff; font-size: 24px; font-weight: 900; letter-spacing: 2px; margin: 0; text-transform: uppercase;">
+                                    DOORWAY <span style="color: #D4AF37;">DETAIL</span>
+                                </h1>
+                                <p style="color: #888888; font-size: 12px; margin-top: 10px; font-weight: bold;">PREMIUM HOME SERVICES</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td style="padding: 40px;">
+                                <h2 style="margin-top: 0; color: #000000; font-size: 28px; font-weight: 800;">Invoice Ready</h2>
+                                <p style="color: #555555; font-size: 16px; line-height: 1.6;">Hi ${job.name},</p>
+                                <p style="color: #555555; font-size: 16px; line-height: 1.6;">
+                                    Thank you for choosing DoorWay Detail. Your invoice for <strong>${job.service || 'Window Cleaning'}</strong> is ready for payment.
+                                </p>
+                                
+                                <table width="100%" style="margin: 30px 0; border-collapse: collapse; background-color: #f9f9f9; border-radius: 8px;">
+                                    <tr>
+                                        <td style="padding: 15px 20px; color: #888888; font-size: 14px;">Service</td>
+                                        <td style="padding: 15px 20px; text-align: right; font-weight: bold; color: #000000;">${job.service || 'Window Cleaning'}</td>
+                                    </tr>
+                                    <tr style="border-top: 1px solid #eeeeee;">
+                                        <td style="padding: 15px 20px; color: #888888; font-size: 14px;">Subtotal</td>
+                                        <td style="padding: 15px 20px; text-align: right; font-weight: bold; color: #000000;">$${subtotal.toFixed(2)}</td>
+                                    </tr>
+                                    <tr style="border-top: 1px solid #eeeeee;">
+                                        <td style="padding: 15px 20px; color: #888888; font-size: 14px;">Tax</td>
+                                        <td style="padding: 15px 20px; text-align: right; font-weight: bold; color: #000000;">$${taxAmount.toFixed(2)}</td>
+                                    </tr>
+                                    <tr style="border-top: 2px solid #000000;">
+                                        <td style="padding: 20px; color: #000000; font-size: 16px; font-weight: 800;">TOTAL DUE</td>
+                                        <td style="padding: 20px; text-align: right; font-weight: 900; font-size: 24px; color: #D4AF37;">$${total.toFixed(2)}</td>
+                                    </tr>
+                                </table>
+
+                                <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+                                    <a href="https://doorway-detail-platform.vercel.app/invoice/${jobId}" style="background-color: #000000; color: #D4AF37; padding: 18px 40px; border-radius: 50px; text-decoration: none; font-weight: 900; font-size: 16px; display: inline-block; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+                                        PAY INVOICE &rarr;
+                                    </a>
+                                </div>
+                                <p style="text-align: center; font-size: 12px; color: #888; margin-top: 20px;">
+                                    Secure payment powered by Stripe
+                                </p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 30px; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p style="color: #888888; font-size: 12px; margin: 0; line-height: 1.5;">
+                                    <strong>DoorWay Detail</strong><br>
+                                    Oakville, ON | 289-772-5757<br>
+                                    <a href="mailto:admin@doorwaydetail.com" style="color: #D4AF37; text-decoration: none;">Contact Support</a>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
+            `
         });
+
+        // 🛑 STOP if Resend gives an error
+        if (error) {
+            console.error("Resend Error:", error);
+            throw new Error(error.message);
+        }
 
         if (job.phone && twilioClient) {
             try {
@@ -206,17 +294,52 @@ export async function emailInvoice(jobId: string) {
     } catch (e: any) { return { success: false, error: e.message }; }
 }
 
+// ✅ FIXED: Submit Quote now updates existing clients
 export async function submitQuote(formData: any) {
     try {
         const { name, email, phone, address, service } = formData;
         const emailLower = email.toLowerCase();
         await ServiceLayer.logEvent('QUOTE_SUBMITTED', { email: emailLower });
 
-        // ... (rest of logic remains same) ...
+        // 1. Check if client exists
+        let clientId: string;
+        const q = await adminDb.collection("clients").where("email", "==", emailLower).get();
+
+        if (!q.empty) {
+            // UPDATE existing client (Fixes the "Unknown" bug)
+            clientId = q.docs[0].id;
+            await adminDb.collection("clients").doc(clientId).update({
+                name,
+                phone,
+                address,
+                lastUpdated: Timestamp.now()
+            });
+        } else {
+            // CREATE new client
+            const coords = await getGeocode(address);
+            const newClient = await adminDb.collection("clients").add({
+                name,
+                email: emailLower,
+                phone,
+                address,
+                geolocation: coords || { lat: 0, lng: 0 },
+                status: "LEAD",
+                createdAt: Timestamp.now(),
+            });
+            clientId = newClient.id;
+        }
+
         const newJob = await adminDb.collection("jobs").add({
-            // ... (stub for brevity, logic unchanged)
-            status: "LEAD_RECEIVED", createdAt: Timestamp.now()
+            clientId,
+            name,
+            email: emailLower,
+            phone,
+            address,
+            service,
+            status: "LEAD_RECEIVED",
+            createdAt: Timestamp.now()
         });
+
         return { success: true, jobId: newJob.id };
     } catch (error: any) { return { success: false, error: error.message }; }
 }
