@@ -1,12 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
     match /jobs/{jobId} {
-      // Allow public to create new quotes (Lead Generation)
-      allow create: if true;
+      // ✅ READ: Public (so customers can view invoices)
+      allow read: if true;
       
-      // Only authenticated staff can see, update, or delete jobs
-      allow read, update, delete: if request.auth != null;
+      // 🔒 WRITE: Locked (must use Server Actions)
+      allow write: if false; 
+    }
+    
+    match /clients/{clientId} {
+      // Clients collection strictly for admins
+      allow read, write: if request.auth != null;
     }
   }
 }

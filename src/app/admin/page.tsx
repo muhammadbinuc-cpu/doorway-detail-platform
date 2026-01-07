@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot, query, doc, deleteDoc, orderBy, limit } from "firebase/firestore";
-import { Loader2, MapPin, Phone, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X, Truck, Repeat, Calendar, RefreshCw } from "lucide-react";
+import { collection, onSnapshot, query, doc, orderBy, limit } from "firebase/firestore"; // ❌ Removed deleteDoc
+import { Loader2, MapPin, Phone, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X, Truck, Repeat } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Link from "next/link";
-import { confirmBooking, updateJobStatus, emailInvoice, updateJobDetails, sendOnMyWay, createRecurringJob } from "../actions";
+import { confirmBooking, updateJobStatus, emailInvoice, updateJobDetails, sendOnMyWay, createRecurringJob, deleteJob } from "../actions"; // ✅ Added deleteJob
 
 interface Job {
     id: string;
@@ -25,7 +25,6 @@ interface Job {
     invoiceNotes?: string;
 }
 
-// ✅ UPDATED: Full Flexibility
 const getNextStatuses = (currentStatus: string): string[] => {
     return ['LEAD_RECEIVED', 'SCHEDULED', 'COMPLETED', 'INVOICED', 'PAID'];
 };
@@ -66,7 +65,14 @@ export default function AdminPage() {
     const activeJobs = jobs.filter(j => j.status !== 'COMPLETED' && j.status !== 'PAID').length;
     const chartData = [{ name: 'Leads', amount: jobs.filter(j => j.status === 'LEAD_RECEIVED').length * 150 }, { name: 'Scheduled', amount: jobs.filter(j => j.status === 'SCHEDULED').reduce((acc, j) => acc + (j.price || 0), 0) }, { name: 'Completed', amount: totalRevenue }];
 
-    const handleDelete = async (id: string) => { if (confirm("Delete this job?")) await deleteDoc(doc(db, "jobs", id)); };
+    // ✅ SECURE: Use Server Action
+    const handleDelete = async (id: string) => { 
+        if (confirm("Delete this job?")) {
+            const res = await deleteJob(id);
+            if (!res.success) alert("Error: " + res.error);
+        }
+    };
+    
     const handleStatusUpdate = async (id: string, status: string) => { const res = await updateJobStatus(id, status); if (!res.success) alert("Error: " + res.error); };
     const handlePrice = async (id: string, val: string) => { await updateJobDetails(id, { price: parseFloat(val) }); };
     const handleSendInvoice = async (id: string) => { if (!confirm("Send Invoice Email?")) return; const res = await emailInvoice(id); if (res.success) alert("✅ Invoice Sent!"); else alert("Error: " + res.error); };

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore"; // ❌ Removed updateDoc
 import { db } from "@/lib/firebase";
 import { useParams } from "next/navigation";
 import { Loader2, CheckCircle, CreditCard, ShieldCheck } from "lucide-react";
+import { markInvoicePaid } from "@/app/actions"; // ✅ Added Server Action
 
 export default function InvoicePage() {
     const params = useParams();
@@ -24,14 +25,19 @@ export default function InvoicePage() {
     }, [id]);
 
     const handlePay = async () => {
-        // MOCK PAYMENT LOGIC (Replace with Stripe later)
         setPaying(true);
-        await new Promise(r => setTimeout(r, 2000)); // Fake processing delay
+        
+        // ✅ SECURE: Call Server Action instead of client write
+        const result = await markInvoicePaid(id);
 
-        await updateDoc(doc(db, "jobs", id), { status: 'PAID' });
-        setJob((prev: any) => ({ ...prev, status: 'PAID' }));
+        if (result.success) {
+            setJob((prev: any) => ({ ...prev, status: 'PAID' }));
+            alert("Payment Successful!");
+        } else {
+            alert("Payment Failed: " + result.error);
+        }
+        
         setPaying(false);
-        alert("Payment Successful!");
     };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-[#D4AF37]" size={48} /></div>;
