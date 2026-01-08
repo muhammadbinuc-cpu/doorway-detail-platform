@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
+    "@stripe/stripe-js": "^8.6.1",
     "@supabase/supabase-js": "^2.89.0",
     "clsx": "^2.1.1",
     "firebase": "^12.7.0",
@@ -22,6 +23,7 @@
     "react-dom": "19.2.3",
     "recharts": "^3.6.0",
     "resend": "^6.6.0",
+    "stripe": "^20.1.2",
     "tailwind-merge": "^3.4.0",
     "twilio": "^5.11.1",
     "zod": "^4.3.4"

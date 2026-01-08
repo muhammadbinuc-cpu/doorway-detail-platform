@@ -8,51 +8,53 @@ import { cookies } from 'next/headers';
 import { Resend } from 'resend';
 import twilio from 'twilio';
 import { ServiceLayer } from '@/lib/services';
+import Stripe from 'stripe';
 
 const MOCK_GEOCODING = true;
 
-// --- SECURITY HELPERS ---
+// --- STRIPE INIT (LAZY LOADING) ---
+// ⚠️ DO NOT initialize at module level - env vars may be undefined during build
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+    if (!_stripe) {
+        const key = process.env.STRIPE_SECRET_KEY;
+        if (!key) throw new Error("STRIPE_SECRET_KEY is undefined");
+        _stripe = new Stripe(key, {
+            apiVersion: '2025-12-15.clover',
+        });
+    }
+    return _stripe;
+}
 
+// --- SECURITY HELPERS ---
 const sanitizeKey = (key: string | undefined) => {
     if (!key) return undefined;
     return key.replace(/['"]/g, "").replace(/\\n/g, "\n");
 };
 
-/**
- * 🔒 GATEKEEPER FUNCTION
- * Checks for the valid session cookie.
- */
 async function requireAdmin() {
     const cookieStore = await cookies();
     const session = cookieStore.get('session_token_v2');
     const secret = sanitizeKey(process.env.ADMIN_SECRET);
-    
+
     if (!secret) throw new Error("Internal: ADMIN_SECRET missing");
     if (!session || session.value !== secret) {
         throw new Error("⛔ UNAUTHORIZED: Access Denied.");
     }
 }
 
-// --- NEW AUTH FUNCTION ---
-
-/**
- * ✅ VERIFY FIREBASE TOKEN (The Bridge)
- * This exchanges a valid Firebase ID Token for our internal Admin Cookie.
- */
+// --- AUTH ---
 export async function verifyFirebaseLogin(idToken: string) {
     try {
-        // 1. Verify the token with Firebase Admin SDK
         const decodedToken = await adminAuth.verifyIdToken(idToken);
-        
-        // 2. If verification passes, create the session
         const secret = sanitizeKey(process.env.ADMIN_SECRET);
         if (!secret) throw new Error("ADMIN_SECRET missing");
 
-        (await cookies()).set('session_token_v2', secret, { 
-            httpOnly: true, 
-            secure: process.env.NODE_ENV === 'production', 
-            maxAge: 86400, 
-            path: '/' 
+        (await cookies()).set('session_token_v2', secret, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 86400,
+            path: '/'
         });
 
         return { success: true, email: decodedToken.email };
@@ -63,16 +65,13 @@ export async function verifyFirebaseLogin(idToken: string) {
 }
 
 // --- INITIALIZATION ---
-
 const resendKey = sanitizeKey(process.env.RESEND_API_KEY);
 const resend = resendKey ? new Resend(resendKey) : null;
-
 const twilioSid = sanitizeKey(process.env.TWILIO_ACCOUNT_SID);
 const twilioToken = sanitizeKey(process.env.TWILIO_AUTH_TOKEN);
 const twilioClient = (twilioSid && twilioToken) ? twilio(twilioSid, twilioToken) : null;
 
 // --- PUBLIC ACTIONS ---
-
 export async function submitQuote(formData: any) {
     try {
         const { name, email, phone, address, service } = formData;
@@ -93,8 +92,7 @@ export async function submitQuote(formData: any) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-// --- PROTECTED ACTIONS ---
-
+// --- PROTECTED ADMIN ACTIONS ---
 export async function createClient(clientData: any) {
     await requireAdmin();
     try {
@@ -150,7 +148,7 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
         const job = (await jobRef.get()).data();
         if (!job) throw new Error("Job not found");
         await jobRef.update({ status: newStatus, lastUpdated: Timestamp.now() });
-        revalidatePath("/admin"); // Ensuring admin list refreshes
+        revalidatePath("/admin");
         return { success: true };
     } catch (error: any) { return { success: false, error: error.message }; }
 }
@@ -236,7 +234,7 @@ export async function emailInvoice(jobId: string) {
             `
         });
         if (error) { console.error("Resend Error:", error); throw new Error(error.message); }
-        
+
         if (job.phone && twilioClient) {
             try { await twilioClient.messages.create({ body: `Hi ${job.name}, your DoorWay Detail invoice is ready. Please check your email.`, from: process.env.TWILIO_FROM_NUMBER, to: job.phone }); } catch (e) { console.error("SMS notification failed:", e); }
         }
@@ -273,6 +271,63 @@ export async function createRecurringJob(originalJobId: string) {
     } catch (error: any) { return { success: false, error: error.message }; }
 }
 
+// --- STRIPE PAYMENT FUNCTION ---
+export async function createCheckoutSession(jobId: string) {
+    const job = (await adminDb.collection("jobs").doc(jobId).get()).data();
+    if (!job) throw new Error("Job not found");
+
+    const price = Number(job.price) || 0;
+    const discount = Number(job.discount) || 0;
+    const taxRate = Number(job.taxRate) || 0;
+    const subtotal = price - discount;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+    const amountInCents = Math.round(total * 100);
+
+    try {
+        const session = await getStripe().checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'cad', // Change to 'usd' if US
+                        product_data: {
+                            name: `Service: ${job.service || 'Window Cleaning'}`,
+                            description: `Invoice #${jobId.slice(0, 6).toUpperCase()}`,
+                        },
+                        unit_amount: amountInCents,
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?success=true`,
+            cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?canceled=true`,
+            metadata: {
+                jobId: jobId,
+            },
+        });
+
+        return { success: true, url: session.url };
+    } catch (error: any) {
+        console.error("Stripe Error:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+// --- PUBLIC HELPERS ---
+export async function deleteJob(jobId: string) {
+    await requireAdmin();
+    try {
+        await adminDb.collection("jobs").doc(jobId).delete();
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to delete job:", error);
+        return { success: false, error: "Delete failed." };
+    }
+}
+
 async function getGeocode(address: string) {
     if (!address) return null;
     if (MOCK_GEOCODING) return { lat: 43.6532, lng: -79.3832 };
@@ -287,48 +342,4 @@ async function getGeocode(address: string) {
         }
         return null;
     } catch (error) { return null; }
-}
-
-// --- NEW SECURE FUNCTIONS FOR OPTION B ---
-
-/**
- * Securely marks an invoice as PAID.
- * Logic runs on the server, bypassing client-side rules.
- */
-export async function markInvoicePaid(jobId: string) {
-    // No admin check here because ANYONE (the customer) needs to be able to pay
-    if (!jobId) throw new Error("No Job ID provided");
-
-    try {
-        await adminDb.collection("jobs").doc(jobId).update({
-            status: "PAID",
-            paidAt: Timestamp.now(), 
-        });
-
-        // Refresh the invoice page so the user sees "PAID" instantly
-        revalidatePath(`/invoice/${jobId}`);
-        revalidatePath(`/admin`); 
-        
-        return { success: true };
-    } catch (error: any) {
-        console.error("Failed to mark paid:", error);
-        return { success: false, error: "Failed to update payment status." };
-    }
-}
-
-/**
- * Securely deletes a job.
- * strictly for Admins.
- */
-export async function deleteJob(jobId: string) {
-    await requireAdmin(); // 🔒 Security Check
-
-    try {
-        await adminDb.collection("jobs").doc(jobId).delete();
-        revalidatePath("/admin");
-        return { success: true };
-    } catch (error: any) {
-        console.error("Failed to delete job:", error);
-        return { success: false, error: "Delete failed." };
-    }
 }

@@ -1,3 +1,5 @@
+import 'server-only'; // 🛡️ CRITICAL SAFETY LOCK
+
 import { google } from 'googleapis';
 import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
@@ -9,10 +11,9 @@ const sanitize = (key: string | undefined) => {
 };
 
 // --- CONFIGURATION ---
-const SYSTEM_EMAIL = process.env.SYSTEM_EMAIL || "doorwaydetail@gmail.com";
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
-// --- LAZY INITIALIZERS (Prevents Startup Crashes) ---
+// --- LAZY INITIALIZERS ---
 const getGoogleAuth = () => {
     const email = process.env.GOOGLE_CLIENT_EMAIL;
     const key = sanitize(process.env.GOOGLE_PRIVATE_KEY);
@@ -44,7 +45,6 @@ const getTwilioClient = () => {
     return Twilio(sid, token);
 };
 
-// Supabase Init (Safe to do at top level if handled correctly, but let's be safe)
 const getSupabase = () => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = sanitize(process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -53,9 +53,6 @@ const getSupabase = () => {
 };
 
 export const ServiceLayer = {
-    /**
-     * CRITICAL: Adds booking to Google Calendar.
-     */
     addToCalendar: async (client: any, date: string, jobInfo: any) => {
         const auth = getGoogleAuth();
         if (!auth) {
@@ -67,7 +64,6 @@ export const ServiceLayer = {
 
         try {
             console.log(`📅 Syncing with Google Calendar (${CALENDAR_ID})...`);
-
             const event = {
                 summary: `DOORWAY JOB: ${client.name} - ${jobInfo.service}`,
                 description: `Phone: ${client.phone}\nAddress: ${client.address}\nPrice: $${jobInfo.price}\nNote: ${jobInfo.invoiceNotes || "None"}`,
@@ -84,14 +80,10 @@ export const ServiceLayer = {
             return res.data;
         } catch (error: any) {
             console.error("❌ CALENDAR SYNC FAILED:", error.message);
-            // We do NOT throw here so the user flow doesn't break completely.
             return null;
         }
     },
 
-    /**
-     * OPTIONAL: Sends SMS via Twilio.
-     */
     sendSMS: async (to: string, body: string) => {
         const client = getTwilioClient();
         if (!client) {
@@ -100,13 +92,12 @@ export const ServiceLayer = {
         }
 
         try {
-            console.log(`💬 Attempting SMS to ${to}...`);
             await client.messages.create({
                 body,
-                from: process.env.TWILIO_PHONE_NUMBER, // Ensure this env var exists!
+                from: process.env.TWILIO_PHONE_NUMBER,
                 to
             });
-            console.log("✅ SMS Sent Successfully.");
+            console.log("✅ SMS Sent.");
             return true;
         } catch (error: any) {
             console.warn("⚠️ SMS Failed:", error.message);
@@ -114,13 +105,9 @@ export const ServiceLayer = {
         }
     },
 
-    /**
-     * OPTIONAL: Logs event to Supabase.
-     */
     logEvent: async (action: string, meta: any) => {
         const supabase = getSupabase();
         if (!supabase) return;
-
         try {
             await supabase.from('audit_logs').insert({
                 action,
@@ -130,11 +117,5 @@ export const ServiceLayer = {
         } catch (error: any) {
             console.warn("⚠️ Logging Failed:", error.message);
         }
-    },
-
-    // Stub for Email to prevent breakages if called
-    sendConfirmationEmail: async (client: any, date: string) => {
-        console.log("📧 Email stub called.");
-        return true;
     }
 };
