@@ -1,194 +1,197 @@
-# CLAUDE.md — Doorway Detail SaaS CRM Platform
+# CLAUDE.md — Doorway Detail SaaS CRM
 
-> **Instructions for Claude Code agents working on this codebase.**
-> Read this file in full before making any changes.
-
----
-
-## 📋 Project Overview
-
-**Doorway Detail** is a SaaS CRM for an exterior cleaning business (pressure washing, window cleaning, gutter detailing) in Oakville, Ontario. It manages the full customer lifecycle from quote submission to payment collection.
-
-**Live URL**: Deployed on Vercel
-**Business Contact**: 289-772-5757 | Doorwaydetail@gmail.com
+> Agent instructions. Read fully before making changes.
 
 ---
 
-## 🛠️ Tech Stack
+## Project Overview
 
-| Layer | Technology | Version |
-|-------|------------|---------|
-| Framework | Next.js (App Router) | 16.1 |
-| UI | React | 19.2 |
-| Language | TypeScript | 5.x |
-| Styling | Tailwind CSS | 4.x |
-| Database | Firebase Firestore | — |
-| Auth | Firebase Authentication (session cookies) | — |
-| Payments | Stripe Checkout | — |
-| Email | Resend + React Email | — |
-| SMS | Twilio | — |
-| Calendar | Google Calendar API | — |
-| Charts | Recharts | — |
-| Validation | Zod | 4.x |
-| Animations | Framer Motion | — |
-| Icons | Lucide React | — |
-| Audit Logs | Supabase (optional) | — |
-| Testing | Jest + ts-jest | — |
+**Doorway Detail** is a SaaS CRM for an exterior cleaning business (pressure washing, window cleaning, gutter detailing) in Oakville, Ontario. Manages the full customer lifecycle: quote → scheduling → invoicing → Stripe payment.
+
+**Live**: Deployed on Vercel  
+**Contact**: 289-772-5757 | Doorwaydetail@gmail.com
 
 ---
 
-## 🚀 Commands
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16.1 (App Router) |
+| UI | React 19.2 + Tailwind CSS 4 |
+| Language | TypeScript 5 |
+| Database | Firebase Firestore |
+| Auth | Firebase Auth (session cookies) |
+| Payments | Stripe Checkout |
+| Email | Resend + React Email |
+| SMS | Twilio |
+| Calendar | Google Calendar API |
+| Charts | Recharts |
+| Validation | Zod 4 |
+| Animations | Framer Motion |
+| Icons | Lucide React |
+| Audit Logs | Supabase (optional) |
+| Testing | Jest + ts-jest |
+
+---
+
+## Commands
 
 ```bash
-# Development
-npm run dev          # Start dev server at http://localhost:3000
-npm run build        # Production build (catches type errors)
-npm run lint         # ESLint check
-npm run test         # Run Jest tests
+npm run dev        # Dev server → http://localhost:3000
+npm run build      # Production build (type-checks everything)
+npm run lint       # ESLint
+npm run test       # Jest (run this before committing)
 
-# Firebase
-firebase deploy --only firestore:rules    # Deploy Firestore security rules
+firebase deploy --only firestore:rules   # Deploy Firestore security rules
 ```
 
 ---
 
-## 📁 Project Structure
+## File Map
 
 ```
-doorway-detail/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx             # Root layout — runs env validation, sets fonts/SEO
-│   │   ├── page.tsx               # Landing page (public, "use client")
-│   │   ├── actions.ts             # ⭐ ALL Server Actions (core business logic)
-│   │   ├── globals.css            # Tailwind CSS base
-│   │   ├── not-found.tsx          # 404 page
-│   │   │
-│   │   ├── admin/
-│   │   │   ├── layout.tsx         # Server-side auth guard (Firebase session cookie)
-│   │   │   ├── page.tsx           # Admin dashboard (jobs, KPIs, charts)
-│   │   │   └── clients/
-│   │   │       ├── page.tsx       # Client list
-│   │   │       └── [id]/page.tsx  # Client detail page
-│   │   │
-│   │   ├── login/page.tsx         # Firebase email/password login
-│   │   ├── quote/page.tsx         # Public quote form
-│   │   ├── invoice/[id]/page.tsx  # Dynamic invoice (public for INVOICED/PAID)
-│   │   ├── privacy/page.tsx       # Privacy policy
-│   │   ├── terms/page.tsx         # Terms of service
-│   │   │
-│   │   └── api/
-│   │       ├── auth/verify/       # Session verification (used by middleware)
-│   │       ├── quotes/route.ts    # Quote submission API
-│   │       └── webhooks/stripe/   # Stripe payment webhook
+src/
+├── app/
+│   ├── layout.tsx               # Root layout — runs env validation, fonts, SEO
+│   ├── page.tsx                 # Landing page ("use client")
+│   ├── globals.css
+│   ├── not-found.tsx
+│   ├── actions.ts               # ⭐ ALL server actions — every mutation lives here
 │   │
-│   ├── components/
-│   │   ├── QuoteModal.tsx         # Quote form modal component
-│   │   └── email/
-│   │       └── InvoiceEmail.tsx   # React Email template for invoices
+│   ├── admin/
+│   │   ├── layout.tsx           # Server component — Firebase session auth guard
+│   │   ├── page.tsx             # Dashboard: job cards, KPIs, chart, modals (dense — refactor target)
+│   │   └── clients/
+│   │       ├── page.tsx         # Client list
+│   │       └── [id]/page.tsx    # Client detail + job history
 │   │
-│   ├── lib/
-│   │   ├── firebase.ts           # Firebase Client SDK (singleton, client-safe)
-│   │   ├── firebase-admin.ts     # Firebase Admin SDK (server-only)
-│   │   ├── google.ts             # Google Calendar integration
-│   │   ├── fsm_logic.ts          # ⭐ Finite State Machine — job status transitions
-│   │   ├── validation.ts         # Zod schemas for all input validation
-│   │   ├── errors.ts             # AppError class + error handling
-│   │   ├── rate-limit.ts         # In-memory rate limiting
-│   │   ├── env-validator.ts      # Startup env var validation
-│   │   ├── services.ts           # Service layer (Calendar, SMS, Supabase)
-│   │   └── safety.ts             # PII redaction + agent output validation
+│   ├── login/page.tsx
+│   ├── quote/page.tsx           # Public quote form → submitQuote server action
+│   ├── invoice/[id]/page.tsx    # Public invoice (INVOICED/PAID status only)
+│   ├── privacy/page.tsx
+│   ├── terms/page.tsx
 │   │
-│   └── middleware.ts              # Edge middleware — protects /admin/* routes
+│   └── api/
+│       ├── auth/verify/route.ts  # Session cookie verification
+│       ├── quotes/route.ts       # Legacy API route (unused — real flow is submitQuote action)
+│       └── webhooks/stripe/      # Stripe payment webhook → marks job PAID
 │
-├── __tests__/
-│   └── fsm.test.ts               # FSM unit tests
-├── firestore.rules                # Firestore security rules
-└── .env.local                     # Environment variables (NEVER commit)
+├── components/
+│   └── email/
+│       └── InvoiceEmail.tsx     # React Email template — accepts service, amount, clientName
+│
+└── lib/
+    ├── key-utils.ts             # ⭐ sanitizeKey() — shared private key sanitizer
+    ├── firebase.ts              # Firebase Client SDK (client components only)
+    ├── firebase-admin.ts        # Firebase Admin SDK (server actions only)
+    ├── google.ts                # Google Calendar — addToGoogleCalendar()
+    ├── fsm_logic.ts             # ⭐ FSM — isValidTransition(), JOB_WORKFLOW
+    ├── validation.ts            # Zod schemas + validateQuote/Job/Client/Booking/Id
+    ├── errors.ts                # AppError class + handleServerActionError()
+    ├── rate-limit.ts            # In-memory rate limiting (quote: 5/15min, login: 5/5min)
+    ├── env-validator.ts         # requireValidEnv() called at startup in layout.tsx
+    └── services.ts              # ServiceLayer.logEvent() → Supabase audit (only thing here)
+
+__tests__/
+└── fsm.test.ts                  # 10 FSM transition tests
 ```
 
 ---
 
-## 🔄 Job Workflow (Finite State Machine)
+## Job Workflow (FSM)
 
-The core business logic uses a strict FSM defined in `src/lib/fsm_logic.ts`:
+Defined in `src/lib/fsm_logic.ts`. **Never bypass `isValidTransition()`.**
 
 ```
 LEAD_RECEIVED → SCHEDULED → COMPLETED → INVOICED → PAID
                                                   → UNPAID → PAID
 LEAD_RECEIVED → LOST (terminal)
-LEAD_RECEIVED → CANCELLED → SCHEDULED (reschedule)
-SCHEDULED → CANCELLED
+LEAD_RECEIVED → CANCELLED
+SCHEDULED     → CANCELLED
+CANCELLED     → SCHEDULED  (reschedule)
+
+⚠️  Emergency override: any state → SCHEDULED always allowed (fsm_logic.ts:26)
+    This is intentional for fixing stuck jobs. Do NOT remove it.
 ```
 
-**CRITICAL**: All status transitions MUST go through `isValidTransition()` from `fsm_logic.ts`. The `JOB_WORKFLOW` object defines allowed transitions. Never bypass this.
+---
+
+## Security Architecture
+
+### Auth Flow
+1. Login at `/login` via Firebase Auth (email/password)
+2. Client sends ID token → `verifyFirebaseLogin` server action
+3. Server sets `__session` cookie (httpOnly, 5-day expiry)
+4. Middleware checks cookie on every `/admin/*` request
+5. `admin/layout.tsx` re-verifies server-side as double check
+
+### Data Access
+- **Public**: GET jobs where status is `INVOICED` or `PAID` only
+- **Writes**: Server Actions via Firebase Admin SDK (bypasses Firestore rules)
+- **Admin reads**: Client SDK with `onSnapshot` (Firestore rules enforce auth)
+
+### Security modules
+- `errors.ts` — never leaks internals; maps to user-safe messages
+- `validation.ts` — strips HTML, validates all inputs at boundary
+- `rate-limit.ts` — IP-based (in-memory, resets on cold start — known tradeoff)
+- `env-validator.ts` — fails fast at startup if required vars missing
+- `.keys/` — service account JSONs are gitignored here
 
 ---
 
-## 🔒 Security Architecture
+## Coding Conventions
 
-### Authentication Flow
-1. User logs in via Firebase Auth (email/password) at `/login`
-2. Client sends ID token to `verifyFirebaseLogin` server action
-3. Server creates a session cookie (`__session`, httpOnly, 5-day expiry)
-4. Middleware checks session cookie on every `/admin/*` request
-5. Admin layout does server-side `verifySessionCookie()` as double-check
+### Server Actions (actions.ts)
+- Every admin action MUST start with `await requireAdmin()`
+- Every doc ID MUST be run through `validateId()` before use
+- Error pattern:
+  ```typescript
+  try {
+      await requireAdmin();
+      validateId(id);
+      // business logic
+  } catch (error) {
+      return handleServerActionError(error, 'actionName');
+  }
+  ```
 
-### Data Access Pattern
-- **Public users**: Can only `GET` jobs with status `INVOICED` or `PAID` (invoice viewing)
-- **All writes**: Go through Server Actions using Firebase Admin SDK (bypasses Firestore rules)
-- **Admin reads**: Use client SDK with `onSnapshot` (requires auth via Firestore rules)
-
-### Key Security Modules
-- `errors.ts` — Never exposes internal details; maps to user-friendly messages
-- `validation.ts` — Zod schemas sanitize all inputs (strips HTML, validates formats)
-- `rate-limit.ts` — IP-based rate limiting on quotes (5/15min) and login (5/5min)
-- `env-validator.ts` — Validates all env vars at startup
-
----
-
-## 📐 Coding Conventions
-
-### General Rules
-1. **Server Actions** are the primary backend — all mutations go through `actions.ts`
-2. **"use server"** at the top of `actions.ts` — every exported function is a server action
-3. **"use client"** on pages that need interactivity (admin dashboard, landing, quote form)
-4. **Admin layout** (`admin/layout.tsx`) is a Server Component that guards all admin routes
-5. Always use `validateId()` before using any Firestore document ID
-6. Always use `requireAdmin()` at the start of any admin-only server action
-
-### TypeScript
-- Use strict types — avoid `any` where possible
-- Define interfaces for Firestore document shapes
-- Use Zod schemas for runtime validation, TypeScript for compile-time
+### Firebase
+- Client SDK (`@/lib/firebase`) — client components only
+- Admin SDK (`@/lib/firebase-admin`) — server actions only. Never import in client components.
 
 ### Styling
-- Tailwind CSS 4 — utility classes only, no custom CSS unless absolutely necessary
-- Color palette: Black (`#000`), Gold (`#D4AF37`), Gray scale
-- Design language: Premium, minimal, modern
-- Rounded corners: `rounded-2xl` or `rounded-3xl`
-- Animations: Framer Motion for page transitions and hover effects
+- Tailwind CSS 4 — utility classes only
+- Color palette: Black `#000`, Gold `#D4AF37`, gray scale
+- Rounded: `rounded-2xl` or `rounded-3xl`
+- Animations: Framer Motion
 
-### Error Handling Pattern
-```typescript
-try {
-    await requireAdmin();
-    // ... business logic
-} catch (error) {
-    return handleServerActionError(error, 'actionName');
-}
-```
+### Key sanitization
+- Use `sanitizeKey()` from `@/lib/key-utils` for any private key/secret env var
+- Do NOT inline `key.replace(/['"]/g, "").replace(/\\n/g, "\n")` — it already exists
 
-### Firebase Pattern
-- Client SDK: Use `db` and `auth` from `@/lib/firebase` (client components only)
-- Admin SDK: Use `adminDb` and `adminAuth` from `@/lib/firebase-admin` (server actions only)
-- Never import `firebase-admin` in client components
+### InvoiceEmail
+- Component is at `src/components/email/InvoiceEmail.tsx`
+- Props: `{ clientName, service, amount, invoiceUrl, invoiceId }`
+- Called in `emailInvoice()` server action — must pass `service: job.service`
 
 ---
 
-## 🔧 Environment Variables
+## Known Issues & Gotchas
 
-### Required (app won't work without these)
+1. **Rate limiting resets on cold start** — in-memory. Fine for now; upgrade to Redis/Firestore for scale.
+2. **Geocoding defaults to mock** — `MOCK_GEOCODING=false` in env enables real Google Maps. Currently hardcodes Toronto coords.
+3. **`api/quotes/route.ts` is dead code** — uses client SDK with wrong field names (`customerName` vs `name`). Real flow is `submitQuote` server action. Don't use this route.
+4. **`services.ts` only has `logEvent`** — the rest was dead code and was removed. If Supabase isn't configured, logEvent silently no-ops.
+5. **Admin page is a single 160-line component** — major refactor target. Extract JobCard, KPI strip, RevenueChart, ScheduleModal, InvoiceSettingsModal.
+6. **`alert()`/`confirm()` throughout admin** — replace with toast (sonner) when refactoring admin.
+7. **`public/` is empty** — no favicon, no OG image for social previews.
+
+---
+
+## Environment Variables
+
+### Required
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
@@ -203,64 +206,23 @@ STRIPE_WEBHOOK_SECRET
 NEXT_PUBLIC_BASE_URL
 ```
 
-### Optional (features degrade gracefully)
+### Optional (features degrade gracefully without these)
 ```
-RESEND_API_KEY          # Email sending
-TWILIO_ACCOUNT_SID      # SMS notifications
-TWILIO_AUTH_TOKEN        # SMS notifications
-TWILIO_FROM_NUMBER       # SMS sender number
-GOOGLE_CALENDAR_ID       # Calendar sync
-NEXT_PUBLIC_SUPABASE_URL       # Audit logging
-SUPABASE_SERVICE_ROLE_KEY      # Audit logging
-```
-
----
-
-## ⚠️ Known Issues & Gotchas
-
-1. **Rate limiting is in-memory** — resets on every Vercel cold start. Fine for now, but consider Redis for scale.
-2. **Geocoding is env-configurable** — set `MOCK_GEOCODING=false` in env to use real Google Maps geocoding. Defaults to mock (Toronto coords).
-3. **Twilio initialization exists in both `actions.ts` and `services.ts`** — duplication that needs consolidation.
-4. **Google Calendar auth exists in both `google.ts` and `services.ts`** — same issue, needs DRY refactor.
-5. **The `services.ts` ServiceLayer.logEvent() uses Supabase** — will silently fail if Supabase isn't configured.
-
----
-
-## 🧪 Testing
-
-```bash
-npm test                    # Run all tests
-npm test -- --watch         # Watch mode
-npm test -- fsm.test.ts     # Run specific test
+RESEND_API_KEY              # Email invoices
+TWILIO_ACCOUNT_SID          # SMS notifications
+TWILIO_AUTH_TOKEN
+TWILIO_FROM_NUMBER
+GOOGLE_CALENDAR_ID          # Calendar sync on booking
+NEXT_PUBLIC_SUPABASE_URL    # Audit logging
+SUPABASE_SERVICE_ROLE_KEY
+MOCK_GEOCODING              # Set to "false" for real Google Maps geocoding
 ```
 
-Test files go in `__tests__/` directory. Use `*.test.ts` naming convention.
-
-Current test coverage:
-- `fsm.test.ts` — FSM transition validation
-
 ---
 
-## 🚢 Deployment
+## Firestore Schema
 
-### Vercel (Production)
-1. Push to `main` branch
-2. Vercel auto-deploys
-3. All env vars must be set in Vercel dashboard
-4. Firestore rules deployed separately via Firebase CLI
-
-### Pre-deployment Checklist
-- [ ] `npm run build` passes with no errors
-- [ ] All env vars configured in Vercel
-- [ ] Stripe webhook endpoint registered: `https://yourdomain.com/api/webhooks/stripe`
-- [ ] Firestore rules deployed
-- [ ] Firebase Auth email/password sign-in enabled
-
----
-
-## 📊 Firestore Collections
-
-### `jobs` Collection
+### `jobs`
 ```typescript
 {
   clientId: string;
@@ -280,7 +242,7 @@ Current test coverage:
 }
 ```
 
-### `clients` Collection
+### `clients`
 ```typescript
 {
   name: string;
@@ -297,18 +259,40 @@ Current test coverage:
 
 ---
 
-## 🔗 Key Routes
+## Routes
 
 | Route | Auth | Description |
 |-------|------|-------------|
 | `/` | Public | Landing page |
-| `/quote` | Public | Quote submission form |
+| `/quote` | Public | Quote submission |
 | `/login` | Public | Admin login |
 | `/admin` | Protected | Job dashboard |
-| `/admin/clients` | Protected | Client management |
+| `/admin/clients` | Protected | Client list |
 | `/admin/clients/[id]` | Protected | Client detail |
-| `/invoice/[id]` | Semi-public | Invoice view (INVOICED/PAID only) |
-| `/privacy` | Public | Privacy policy |
-| `/terms` | Public | Terms of service |
-| `/api/auth/verify` | Internal | Session verification |
-| `/api/webhooks/stripe` | Stripe | Payment webhook |
+| `/invoice/[id]` | Semi-public | Invoice (INVOICED/PAID only) |
+| `/api/webhooks/stripe` | Stripe | Payment confirmation |
+
+---
+
+## Testing
+
+```bash
+npm test                        # All tests
+npm test -- --watch             # Watch mode
+npm test -- fsm.test.ts         # Specific file
+```
+
+Tests live in `__tests__/`. Current coverage: `fsm.test.ts` (10 cases, full workflow + admin override).
+
+---
+
+## Deployment
+
+Push to `main` → Vercel auto-deploys.
+
+Pre-deploy checklist:
+- `npm run build` clean
+- `npm run test` passing
+- All required env vars in Vercel dashboard
+- Stripe webhook registered at `https://<domain>/api/webhooks/stripe`
+- Firestore rules deployed via `firebase deploy --only firestore:rules`
