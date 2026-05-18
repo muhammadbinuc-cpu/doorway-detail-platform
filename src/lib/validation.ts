@@ -138,14 +138,6 @@ export const BookingSchema = z.object({
 });
 
 /**
- * 🔒 Client notes update schema
- */
-export const ClientNotesSchema = z.object({
-    clientId: firestoreIdSchema,
-    notes: notesSchema
-});
-
-/**
  * 🔒 Simple ID schema for single-parameter actions
  */
 export const IdSchema = z.object({

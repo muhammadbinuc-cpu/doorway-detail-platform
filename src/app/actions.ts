@@ -27,6 +27,7 @@ import {
 } from '@/lib/validation';
 import { enforceRateLimit, resetRateLimit } from '@/lib/rate-limit';
 import { isValidTransition, JOB_WORKFLOW } from '@/lib/fsm_logic';
+import { sanitizeKey } from '@/lib/key-utils';
 
 const MOCK_GEOCODING = process.env.MOCK_GEOCODING !== 'false';
 const SESSION_COOKIE_NAME = '__session';
@@ -44,8 +45,6 @@ function getStripe(): Stripe {
 }
 
 // --- EMAIL/SMS INIT ---
-const sanitizeKey = (key: string | undefined) => key?.replace(/['"]/g, "").replace(/\\n/g, "\n");
-
 let _resend: Resend | null = null;
 function getResend(): Resend {
     if (!_resend) {
@@ -297,6 +296,7 @@ export async function emailInvoice(jobId: string) {
             subject: `Invoice #${jobId.slice(0, 6).toUpperCase()} from DoorWay Detail`,
             react: InvoiceEmail({
                 clientName: job.name,
+                service: job.service || 'Cleaning Service',
                 amount: Number(total),
                 invoiceUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}`,
                 invoiceId: jobId,

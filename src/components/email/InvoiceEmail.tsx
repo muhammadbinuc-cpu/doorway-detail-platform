@@ -16,6 +16,7 @@ import * as React from "react";
 
 interface InvoiceEmailProps {
   clientName: string;
+  service: string;
   amount: number;
   invoiceUrl: string;
   invoiceId: string;
@@ -23,6 +24,7 @@ interface InvoiceEmailProps {
 
 export const InvoiceEmail = ({
   clientName,
+  service,
   amount,
   invoiceUrl,
   invoiceId,
@@ -63,7 +65,7 @@ export const InvoiceEmail = ({
             <Section style={summaryBox}>
               <Row style={{ marginBottom: "16px", borderBottom: "1px solid #e5e7eb", paddingBottom: "16px" }}>
                 <Column>
-                  <Text style={itemTitle}>Window Cleaning</Text>
+                  <Text style={itemTitle}>{service}</Text>
                 </Column>
                 <Column style={{ textAlign: "right" }}>
                   <Text style={itemPrice}>${amount.toFixed(2)}</Text>

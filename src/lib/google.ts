@@ -1,10 +1,8 @@
 import "server-only";
 import { google } from "googleapis";
+import { sanitizeKey } from "@/lib/key-utils";
 
-// 1. SAFE KEY EXTRACTION
-// We strip quotes and fix newlines, just like we did for Firebase
-const rawKey = process.env.GOOGLE_PRIVATE_KEY || "";
-const cleanKey = rawKey.replace(/['"]/g, "").replace(/\\n/g, "\n");
+const cleanKey = sanitizeKey(process.env.GOOGLE_PRIVATE_KEY) ?? "";
 
 // 2. Initialize Auth (Lazy/Safe)
 const getAuth = () => {

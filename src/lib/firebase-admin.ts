@@ -1,10 +1,8 @@
 import "server-only";
 import admin from "firebase-admin";
+import { sanitizeKey } from "@/lib/key-utils";
 
-// 1. Setup Service Account
-// We clean the key to remove accidental quotes AND fix newlines
-const rawKey = process.env.GOOGLE_PRIVATE_KEY || "";
-const cleanKey = rawKey.replace(/['"]/g, "").replace(/\\n/g, "\n");
+const cleanKey = sanitizeKey(process.env.GOOGLE_PRIVATE_KEY) ?? "";
 
 const serviceAccount = {
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
