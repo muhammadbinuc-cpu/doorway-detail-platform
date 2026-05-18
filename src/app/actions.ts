@@ -1,5 +1,9 @@
 "use server";
 
+// 🔒 ============================================
+// 🔒 SECURE SERVER ACTIONS - Doorway Detail SaaS
+// 🔒 ============================================
+
 import { revalidatePath } from "next/cache";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
@@ -9,206 +13,274 @@ import { Resend } from 'resend';
 import twilio from 'twilio';
 import { ServiceLayer } from '@/lib/services';
 import Stripe from 'stripe';
+import { ZodError } from 'zod';
+import InvoiceEmail from "@/components/email/InvoiceEmail"; // <--- ADDED IMPORT
 
-const MOCK_GEOCODING = true;
+// 🔒 Security imports
+import { handleServerActionError, createFsmError, AppError } from '@/lib/errors';
+import {
+    validateQuote,
+    validateJobUpdate,
+    validateClient,
+    validateId,
+    validateBooking,
+} from '@/lib/validation';
+import { enforceRateLimit, resetRateLimit } from '@/lib/rate-limit';
+import { isValidTransition, JOB_WORKFLOW } from '@/lib/fsm_logic';
 
-// --- STRIPE INIT (LAZY LOADING) ---
-// ⚠️ DO NOT initialize at module level - env vars may be undefined during build
+const MOCK_GEOCODING = process.env.MOCK_GEOCODING !== 'false';
+const SESSION_COOKIE_NAME = '__session';
+const SESSION_COOKIE_EXPIRES_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
+
+// --- STRIPE INIT ---
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
     if (!_stripe) {
         const key = process.env.STRIPE_SECRET_KEY;
-        if (!key) throw new Error("STRIPE_SECRET_KEY is undefined");
-        _stripe = new Stripe(key, {
-            apiVersion: '2025-12-15.clover',
-        });
+        if (!key) throw new AppError('config-error', 'STRIPE_SECRET_KEY is undefined', 'Payment service unavailable');
+        _stripe = new Stripe(key, { apiVersion: '2025-12-15.clover' });
     }
     return _stripe;
 }
 
-// --- SECURITY HELPERS ---
-const sanitizeKey = (key: string | undefined) => {
-    if (!key) return undefined;
-    return key.replace(/['"]/g, "").replace(/\\n/g, "\n");
-};
+// --- EMAIL/SMS INIT ---
+const sanitizeKey = (key: string | undefined) => key?.replace(/['"]/g, "").replace(/\\n/g, "\n");
 
+let _resend: Resend | null = null;
+function getResend(): Resend {
+    if (!_resend) {
+        const key = sanitizeKey(process.env.RESEND_API_KEY);
+        if (!key) throw new AppError('config-error', 'RESEND_API_KEY missing', 'Email service not configured');
+        _resend = new Resend(key);
+    }
+    return _resend;
+}
+
+let _twilioClient: ReturnType<typeof twilio> | null = null;
+function getTwilioClient(): ReturnType<typeof twilio> {
+    if (!_twilioClient) {
+        const sid = sanitizeKey(process.env.TWILIO_ACCOUNT_SID);
+        const token = sanitizeKey(process.env.TWILIO_AUTH_TOKEN);
+        if (!sid || !token) throw new AppError('config-error', 'Twilio credentials missing', 'SMS service not configured');
+        _twilioClient = twilio(sid, token);
+    }
+    return _twilioClient;
+}
+
+// 🔒 Secure session verification
 async function requireAdmin() {
     const cookieStore = await cookies();
-    const session = cookieStore.get('session_token_v2');
-    const secret = sanitizeKey(process.env.ADMIN_SECRET);
-
-    if (!secret) throw new Error("Internal: ADMIN_SECRET missing");
-    if (!session || session.value !== secret) {
-        throw new Error("⛔ UNAUTHORIZED: Access Denied.");
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
+    if (!sessionCookie?.value) throw new AppError('unauthorized', 'No session cookie', 'Access denied.');
+    try {
+        await adminAuth.verifySessionCookie(sessionCookie.value, true);
+    } catch (error: any) {
+        throw new AppError('unauthorized', `Session invalid: ${error.code}`, 'Session expired.');
     }
 }
 
-// --- AUTH ---
+// ============================================
+// 🔒 AUTH ACTIONS
+// ============================================
 export async function verifyFirebaseLogin(idToken: string) {
     try {
+        await enforceRateLimit('login');
         const decodedToken = await adminAuth.verifyIdToken(idToken);
-        const secret = sanitizeKey(process.env.ADMIN_SECRET);
-        if (!secret) throw new Error("ADMIN_SECRET missing");
-
-        (await cookies()).set('session_token_v2', secret, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 86400,
-            path: '/'
+        const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn: SESSION_COOKIE_EXPIRES_MS });
+        (await cookies()).set(SESSION_COOKIE_NAME, sessionCookie, {
+            httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: SESSION_COOKIE_EXPIRES_MS / 1000, path: '/'
         });
-
+        resetRateLimit('login', decodedToken.email || decodedToken.uid);
         return { success: true, email: decodedToken.email };
-    } catch (error: any) {
-        console.error("Auth Verification Failed:", error);
-        return { success: false, error: "Invalid Token" };
+    } catch (error) {
+        return handleServerActionError(error, 'verifyFirebaseLogin');
     }
 }
 
-// --- INITIALIZATION ---
-const resendKey = sanitizeKey(process.env.RESEND_API_KEY);
-const resend = resendKey ? new Resend(resendKey) : null;
-const twilioSid = sanitizeKey(process.env.TWILIO_ACCOUNT_SID);
-const twilioToken = sanitizeKey(process.env.TWILIO_AUTH_TOKEN);
-const twilioClient = (twilioSid && twilioToken) ? twilio(twilioSid, twilioToken) : null;
-
-// --- PUBLIC ACTIONS ---
-export async function submitQuote(formData: any) {
+export async function revokeSession() {
     try {
-        const { name, email, phone, address, service } = formData;
-        const emailLower = email.toLowerCase();
-        await ServiceLayer.logEvent('QUOTE_SUBMITTED', { email: emailLower });
+        const cookieStore = await cookies();
+        const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
+        if (sessionCookie?.value) {
+            try {
+                const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie.value);
+                await adminAuth.revokeRefreshTokens(decodedClaims.uid);
+            } catch { }
+        }
+        (await cookies()).delete(SESSION_COOKIE_NAME);
+        return { success: true };
+    } catch (error) {
+        return handleServerActionError(error, 'revokeSession');
+    }
+}
+
+// ============================================
+// 🔒 PUBLIC ACTIONS
+// ============================================
+export async function submitQuote(formData: unknown) {
+    try {
+        await enforceRateLimit('quote');
+        const { name, email, phone, address, service } = validateQuote(formData);
+        await ServiceLayer.logEvent('QUOTE_SUBMITTED', { email });
+
         let clientId: string;
-        const q = await adminDb.collection("clients").where("email", "==", emailLower).get();
+        const q = await adminDb.collection("clients").where("email", "==", email).get();
+
         if (!q.empty) {
             clientId = q.docs[0].id;
             await adminDb.collection("clients").doc(clientId).update({ name, phone, address, lastUpdated: Timestamp.now() });
         } else {
             const coords = await getGeocode(address);
-            const newClient = await adminDb.collection("clients").add({ name, email: emailLower, phone, address, geolocation: coords || { lat: 0, lng: 0 }, status: "LEAD", createdAt: Timestamp.now() });
+            const newClient = await adminDb.collection("clients").add({
+                name, email, phone, address, geolocation: coords || { lat: 0, lng: 0 }, status: "LEAD", createdAt: Timestamp.now()
+            });
             clientId = newClient.id;
         }
-        const newJob = await adminDb.collection("jobs").add({ clientId, name, email: emailLower, phone, address, service, status: "LEAD_RECEIVED", createdAt: Timestamp.now() });
+
+        const newJob = await adminDb.collection("jobs").add({
+            clientId, name, email, phone, address, service, status: "LEAD_RECEIVED", createdAt: Timestamp.now()
+        });
+
         return { success: true, jobId: newJob.id };
-    } catch (error: any) { return { success: false, error: error.message }; }
+    } catch (error) {
+        if (error instanceof ZodError) return { success: false, error: error.issues[0].message };
+        return handleServerActionError(error, 'submitQuote');
+    }
 }
 
-// --- PROTECTED ADMIN ACTIONS ---
-export async function createClient(clientData: any) {
+// ============================================
+// 🔒 PROTECTED ADMIN ACTIONS
+// ============================================
+export async function createClient(clientData: unknown) {
     await requireAdmin();
     try {
-        const coordinates = await getGeocode(clientData.address);
+        const validated = validateClient(clientData);
+        const coordinates = await getGeocode(validated.address);
         const newClient = await adminDb.collection("clients").add({
-            ...clientData,
-            email: clientData.email.toLowerCase(),
-            geolocation: coordinates || { lat: 0, lng: 0 },
-            status: 'LEAD',
-            createdAt: Timestamp.now(),
+            ...validated, propertyNotes: validated.propertyNotes || '', geolocation: coordinates || { lat: 0, lng: 0 }, status: 'LEAD', createdAt: Timestamp.now(),
         });
         return { success: true, clientId: newClient.id };
-    } catch (error: any) { return { success: false, error: error.message }; }
+    } catch (error) {
+        if (error instanceof ZodError) return { success: false, error: error.issues[0].message };
+        return handleServerActionError(error, 'createClient');
+    }
 }
 
 export async function deleteClient(clientId: string) {
     await requireAdmin();
     try {
+        validateId(clientId);
         await adminDb.collection("clients").doc(clientId).delete();
         return { success: true };
-    } catch (error: any) { return { success: false, error: error.message }; }
+    } catch (error) {
+        return handleServerActionError(error, 'deleteClient');
+    }
 }
 
 export async function updateClientNotes(clientId: string, notes: string) {
     await requireAdmin();
     try {
-        await adminDb.collection("clients").doc(clientId).update({ propertyNotes: notes, lastUpdated: Timestamp.now() });
+        validateId(clientId);
+        const sanitizedNotes = notes.trim().slice(0, 2000).replace(/<[^>]*>/g, '');
+        await adminDb.collection("clients").doc(clientId).update({ propertyNotes: sanitizedNotes, lastUpdated: Timestamp.now() });
         return { success: true };
-    } catch (error: any) { return { success: false, error: error.message }; }
+    } catch (error) {
+        return handleServerActionError(error, 'updateClientNotes');
+    }
 }
 
 export async function createJobFromClient(clientId: string) {
     await requireAdmin();
     try {
+        validateId(clientId);
         const client = (await adminDb.collection("clients").doc(clientId).get()).data();
-        if (!client) throw new Error("Client missing");
+        if (!client) throw new AppError('not-found', `Client ${clientId} not found`, 'Client not found');
+
         const res = await adminDb.collection("jobs").add({
-            clientId,
-            name: client.name, email: client.email, phone: client.phone, address: client.address,
-            service: "Window Cleaning",
-            status: "LEAD_RECEIVED",
-            createdAt: Timestamp.now(),
-            price: 0
+            clientId, name: client.name, email: client.email, phone: client.phone, address: client.address, service: "Window Cleaning", status: "LEAD_RECEIVED", createdAt: Timestamp.now(), price: 0
         });
         return { success: true, jobId: res.id };
-    } catch (e: any) { return { success: false, error: e.message }; }
+    } catch (error) {
+        return handleServerActionError(error, 'createJobFromClient');
+    }
 }
 
 export async function updateJobStatus(jobId: string, newStatus: string) {
     await requireAdmin();
     try {
+        validateId(jobId);
         const jobRef = adminDb.collection("jobs").doc(jobId);
         const job = (await jobRef.get()).data();
-        if (!job) throw new Error("Job not found");
+        if (!job) throw new AppError('not-found', `Job ${jobId} not found`, 'Job not found');
+
+        if (!isValidTransition(job.status, newStatus)) {
+            await ServiceLayer.logEvent('FSM_VIOLATION', { jobId, from: job.status, to: newStatus });
+            throw createFsmError(job.status, newStatus, JOB_WORKFLOW[job.status] || []);
+        }
+
         await jobRef.update({ status: newStatus, lastUpdated: Timestamp.now() });
         revalidatePath("/admin");
         return { success: true };
-    } catch (error: any) { return { success: false, error: error.message }; }
+    } catch (error) {
+        return handleServerActionError(error, 'updateJobStatus');
+    }
 }
 
 export async function confirmBooking(jobId: string, date: string) {
     await requireAdmin();
     try {
-        await ServiceLayer.logEvent('BOOKING_CONFIRMED', { jobId, date });
-        const jobRef = adminDb.collection("jobs").doc(jobId);
+        const validated = validateBooking(jobId, date);
+        await ServiceLayer.logEvent('BOOKING_CONFIRMED', { jobId: validated.jobId, date: validated.date });
+        const jobRef = adminDb.collection("jobs").doc(validated.jobId);
         const job = (await jobRef.get()).data();
-        if (!job) throw new Error("Job not found");
+        if (!job) throw new AppError('not-found', `Job not found`, 'Job not found');
 
-        try {
-            await addToGoogleCalendar({
-                title: `Service: ${job.name}`, description: `Phone: ${job.phone}`, location: job.address
-            }, date);
-        } catch (e) { console.error("Cal Error:", e); }
+        try { await addToGoogleCalendar({ title: `Service: ${job.name}`, description: `Phone: ${job.phone}`, location: job.address }, validated.date); } catch (e) { console.error("Calendar sync failed:", e); }
 
-        if (job.phone && twilioClient) {
+        if (job.phone) {
             try {
-                const dateStr = new Date(date).toLocaleDateString();
-                const msg = job.status === 'SCHEDULED'
-                    ? `Hi ${job.name}, your DoorWay Detail appointment has been RESCHEDULED to ${dateStr}.`
-                    : `Hi ${job.name}, DoorWay Detail confirmed your appointment for ${dateStr}.`;
-
-                await twilioClient.messages.create({
-                    body: msg,
-                    from: process.env.TWILIO_FROM_NUMBER, to: job.phone
-                });
-            } catch (e) { console.error("SMS Failed:", e); }
+                const twilio = getTwilioClient();
+                const dateStr = new Date(validated.date).toLocaleDateString();
+                const msg = job.status === 'SCHEDULED' ? `Hi ${job.name}, rescheduled to ${dateStr}.` : `Hi ${job.name}, confirmed for ${dateStr}.`;
+                await twilio.messages.create({ body: msg, from: process.env.TWILIO_FROM_NUMBER, to: job.phone });
+            } catch (e) { console.error("SMS failed:", e); }
         }
 
-        await jobRef.update({ status: 'SCHEDULED', scheduledDate: date, lastUpdated: Timestamp.now() });
+        await jobRef.update({ status: 'SCHEDULED', scheduledDate: validated.date, lastUpdated: Timestamp.now() });
         revalidatePath("/admin");
         return { success: true };
-    } catch (e: any) { return { success: false, error: e.message }; }
+    } catch (error) {
+        if (error instanceof ZodError) return { success: false, error: error.issues[0].message };
+        return handleServerActionError(error, 'confirmBooking');
+    }
 }
 
-export async function updateJobDetails(jobId: string, data: any) {
+export async function updateJobDetails(jobId: string, data: unknown) {
     await requireAdmin();
     try {
-        const cleanData = { ...data };
-        if (cleanData.discount !== undefined) cleanData.discount = Number(cleanData.discount);
-        if (cleanData.taxRate !== undefined) cleanData.taxRate = Number(cleanData.taxRate);
-        if (cleanData.price !== undefined) cleanData.price = Number(cleanData.price);
-
-        await adminDb.collection("jobs").doc(jobId).update({ ...cleanData, lastUpdated: Timestamp.now() });
+        validateId(jobId);
+        const validated = validateJobUpdate(data);
+        await adminDb.collection("jobs").doc(jobId).update({ ...validated, lastUpdated: Timestamp.now() });
         revalidatePath("/admin");
         return { success: true };
-    } catch (error: any) { return { success: false, error: error.message }; }
+    } catch (error) {
+        if (error instanceof ZodError) return { success: false, error: error.issues[0].message };
+        return handleServerActionError(error, 'updateJobDetails');
+    }
 }
 
+/**
+ * 🔒 Send invoice email to customer
+ */
 export async function emailInvoice(jobId: string) {
     await requireAdmin();
     try {
-        if (!resend) throw new Error("CRITICAL: RESEND_API_KEY is missing or invalid.");
+        validateId(jobId);
+        const resendClient = getResend();
         const jobRef = adminDb.collection("jobs").doc(jobId);
         const job = (await jobRef.get()).data();
-        if (!job?.email) throw new Error("No email found");
 
+        if (!job?.email) throw new AppError('validation-error', 'No email on job', 'Customer email not found');
         await ServiceLayer.logEvent('INVOICE_SENT', { jobId, email: job.email });
 
         const price = Number(job.price) || 0;
@@ -218,113 +290,105 @@ export async function emailInvoice(jobId: string) {
         const taxAmount = subtotal * (taxRate / 100);
         const total = subtotal + taxAmount;
 
-        const { data, error } = await resend.emails.send({
+        // 🟢 UPDATED: Sending Professional React Email
+        const { error } = await resendClient.emails.send({
             from: 'DoorWay Detail <onboarding@resend.dev>',
             to: job.email,
             subject: `Invoice #${jobId.slice(0, 6).toUpperCase()} from DoorWay Detail`,
-            html: `
-                <!DOCTYPE html>
-                <html>
-                <body style="font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 40px 0;">
-                    <p>Hi ${job.name},</p>
-                    <p>Total Due: <strong>$${total.toFixed(2)}</strong></p>
-                    <p><a href="https://doorway-detail-platform.vercel.app/invoice/${jobId}">Pay Now</a></p>
-                </body>
-                </html>
-            `
+            react: InvoiceEmail({
+                clientName: job.name,
+                amount: Number(total),
+                invoiceUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}`,
+                invoiceId: jobId,
+            }),
         });
-        if (error) { console.error("Resend Error:", error); throw new Error(error.message); }
 
-        if (job.phone && twilioClient) {
-            try { await twilioClient.messages.create({ body: `Hi ${job.name}, your DoorWay Detail invoice is ready. Please check your email.`, from: process.env.TWILIO_FROM_NUMBER, to: job.phone }); } catch (e) { console.error("SMS notification failed:", e); }
+        if (error) {
+            console.error('Resend Error:', error);
+            throw new AppError('email-error', 'Failed to send email', JSON.stringify(error));
         }
+
+        if (job.phone) {
+            try {
+                const twilio = getTwilioClient();
+                await twilio.messages.create({ body: `Hi ${job.name}, your DoorWay Detail invoice is ready. Please check your email.`, from: process.env.TWILIO_FROM_NUMBER, to: job.phone });
+            } catch (e) { console.error("SMS notification failed:", e); }
+        }
+
         await jobRef.update({ status: 'INVOICED', lastUpdated: Timestamp.now() });
         revalidatePath("/admin");
         return { success: true };
-    } catch (e: any) { return { success: false, error: e.message }; }
+    } catch (error) {
+        return handleServerActionError(error, 'emailInvoice');
+    }
 }
 
 export async function sendOnMyWay(jobId: string) {
     await requireAdmin();
     try {
+        validateId(jobId);
         const jobRef = adminDb.collection("jobs").doc(jobId);
         const job = (await jobRef.get()).data();
-        if (!job || !job.phone) throw new Error("Job or phone missing");
+        if (!job || !job.phone) throw new AppError('validation-error', 'Job/Phone missing', 'Phone number not found');
+
         await ServiceLayer.logEvent('ON_MY_WAY_SENT', { jobId });
-        if (twilioClient) {
-            await twilioClient.messages.create({ body: `🚗 Hi ${job.name}, DoorWay Detail is on the way! We will arrive in approximately 20-30 minutes.`, from: process.env.TWILIO_FROM_NUMBER, to: job.phone });
-            return { success: true };
-        } else { console.log("MOCK SMS: On My Way sent to " + job.phone); return { success: true, mocked: true }; }
-    } catch (error: any) { return { success: false, error: error.message }; }
+        const twilio = getTwilioClient();
+        await twilio.messages.create({ body: `🚗 Hi ${job.name}, DoorWay Detail is on the way! ETA: 20-30 mins.`, from: process.env.TWILIO_FROM_NUMBER, to: job.phone });
+        return { success: true };
+    } catch (error) {
+        return handleServerActionError(error, 'sendOnMyWay');
+    }
 }
 
 export async function createRecurringJob(originalJobId: string) {
     await requireAdmin();
     try {
+        validateId(originalJobId);
         const originalJob = (await adminDb.collection("jobs").doc(originalJobId).get()).data();
-        if (!originalJob) throw new Error("Original job not found");
-        const nextDate = new Date();
-        nextDate.setMonth(nextDate.getMonth() + 1);
-        const newJob = await adminDb.collection("jobs").add({ ...originalJob, status: "LEAD_RECEIVED", createdAt: Timestamp.now(), scheduledDate: null, service: originalJob.service + " (Recurring)", price: originalJob.price });
+        if (!originalJob) throw new AppError('not-found', `Job not found`, 'Job not found');
+
+        const newJob = await adminDb.collection("jobs").add({
+            ...originalJob, status: "LEAD_RECEIVED", createdAt: Timestamp.now(), scheduledDate: null, service: originalJob.service + " (Recurring)", price: originalJob.price
+        });
         revalidatePath("/admin");
         return { success: true, jobId: newJob.id };
-    } catch (error: any) { return { success: false, error: error.message }; }
-}
-
-// --- STRIPE PAYMENT FUNCTION ---
-export async function createCheckoutSession(jobId: string) {
-    const job = (await adminDb.collection("jobs").doc(jobId).get()).data();
-    if (!job) throw new Error("Job not found");
-
-    const price = Number(job.price) || 0;
-    const discount = Number(job.discount) || 0;
-    const taxRate = Number(job.taxRate) || 0;
-    const subtotal = price - discount;
-    const taxAmount = subtotal * (taxRate / 100);
-    const total = subtotal + taxAmount;
-    const amountInCents = Math.round(total * 100);
-
-    try {
-        const session = await getStripe().checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: [
-                {
-                    price_data: {
-                        currency: 'cad', // Change to 'usd' if US
-                        product_data: {
-                            name: `Service: ${job.service || 'Window Cleaning'}`,
-                            description: `Invoice #${jobId.slice(0, 6).toUpperCase()}`,
-                        },
-                        unit_amount: amountInCents,
-                    },
-                    quantity: 1,
-                },
-            ],
-            mode: 'payment',
-            success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?success=true`,
-            cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?canceled=true`,
-            metadata: {
-                jobId: jobId,
-            },
-        });
-
-        return { success: true, url: session.url };
-    } catch (error: any) {
-        console.error("Stripe Error:", error);
-        return { success: false, error: error.message };
+    } catch (error) {
+        return handleServerActionError(error, 'createRecurringJob');
     }
 }
 
-// --- PUBLIC HELPERS ---
+export async function createCheckoutSession(jobId: string) {
+    try {
+        validateId(jobId);
+        const job = (await adminDb.collection("jobs").doc(jobId).get()).data();
+        if (!job) throw new AppError('not-found', `Job not found`, 'Invoice not found');
+
+        const price = Number(job.price) || 0;
+        const discount = Number(job.discount) || 0;
+        const taxRate = Number(job.taxRate) || 0;
+        const total = (price - discount) * (1 + (taxRate / 100));
+        const amountInCents = Math.round(total * 100);
+
+        const session = await getStripe().checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{ price_data: { currency: 'cad', product_data: { name: `Service: ${job.service}`, description: `Invoice #${jobId.slice(0, 6).toUpperCase()}` }, unit_amount: amountInCents }, quantity: 1 }],
+            mode: 'payment', success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?success=true`, cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?canceled=true`, metadata: { jobId },
+        });
+        return { success: true, url: session.url };
+    } catch (error) {
+        return handleServerActionError(error, 'createCheckoutSession');
+    }
+}
+
 export async function deleteJob(jobId: string) {
     await requireAdmin();
     try {
+        validateId(jobId);
         await adminDb.collection("jobs").doc(jobId).delete();
         revalidatePath("/admin");
         return { success: true };
-    } catch (error: any) {
-        console.error("Failed to delete job:", error);
-        return { success: false, error: "Delete failed." };
+    } catch (error) {
+        return handleServerActionError(error, 'deleteJob');
     }
 }
 
@@ -336,10 +400,7 @@ async function getGeocode(address: string) {
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
         const response = await fetch(url);
         const data = await response.json();
-        if (data.status === 'OK' && data.results.length > 0) {
-            const { lat, lng } = data.results[0].geometry.location;
-            return { lat, lng };
-        }
+        if (data.status === 'OK' && data.results.length > 0) return data.results[0].geometry.location;
         return null;
-    } catch (error) { return null; }
+    } catch { return null; }
 }

@@ -31,9 +31,9 @@ export default function InvoicePage() {
         setPaying(true);
         const result = await createCheckoutSession(id);
         if (result.success && result.url) {
-            window.location.href = result.url; 
+            window.location.href = result.url;
         } else {
-            alert("Payment Init Failed: " + result.error);
+            alert("Payment Init Failed: " + ('error' in result ? result.error : 'Unknown error'));
             setPaying(false);
         }
     };
@@ -44,7 +44,7 @@ export default function InvoicePage() {
     const price = Number(job.price) || 0;
     const discount = Number(job.discount) || 0;
     const subtotal = price - discount;
-    const taxRate = Number(job.taxRate) || 0; 
+    const taxRate = Number(job.taxRate) || 0;
     const taxAmount = subtotal * (taxRate / 100);
     const total = subtotal + taxAmount;
 

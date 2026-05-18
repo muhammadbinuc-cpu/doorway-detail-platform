@@ -1,22 +1,33 @@
+// 🔒 src/app/admin/layout.tsx - Admin Layout with Session Verification
+// Server-side session verification using Firebase Admin SDK
+
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { adminAuth } from '@/lib/firebase-admin';
+
+const SESSION_COOKIE_NAME = '__session';
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // 1. Get the session cookie
+  // 🔒 Get the session cookie
   const cookieStore = await cookies();
-  const session = cookieStore.get('session_token_v2');
-  
-  // 2. Check against the Server Secret
-  const secret = process.env.ADMIN_SECRET;
+  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-  // 3. The Gatekeeper Check
-  if (!session || !secret || session.value !== secret) {
-      // If cookie is missing or doesn't match secret -> Kick to Login
-      redirect('/login');
+  // 🔒 No session cookie = redirect to login
+  if (!sessionCookie?.value) {
+    redirect('/login');
+  }
+
+  // 🔒 Verify the session cookie with Firebase Admin
+  try {
+    await adminAuth.verifySessionCookie(sessionCookie.value, true /* checkRevoked */);
+  } catch (error: any) {
+    // 🔒 Session invalid/expired - redirect to login
+    console.error('[AdminLayout] Session verification failed:', error.code);
+    redirect('/login');
   }
 
   return <>{children}</>;

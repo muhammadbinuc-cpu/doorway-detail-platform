@@ -2,17 +2,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // 🔒 JOBS COLLECTION - Public invoice viewing with restricted access
     match /jobs/{jobId} {
-      // ✅ READ: Public (so customers can view invoices)
-      allow read: if true;
       
-      // 🔒 WRITE: Locked (must use Server Actions)
+      // 🔒 READ RULES:
+      // - GET (single document): Allow only for INVOICED or PAID jobs (customer invoice viewing)
+      // - LIST (query): Block for unauthenticated users (prevents data scraping/enumeration)
+      allow get: if resource.data.status == 'INVOICED' || resource.data.status == 'PAID';
+      allow list: if request.auth != null;
+      
+      // 🔒 WRITE: Strictly locked - all writes must go through Server Actions (firebase-admin)
+      // Server Actions use the Admin SDK which bypasses these rules entirely
       allow write: if false; 
     }
     
+    // 🔒 CLIENTS COLLECTION - Contains PII, strictly authenticated access only
     match /clients/{clientId} {
-      // Clients collection strictly for admins
-      allow read, write: if request.auth != null;
+      // 🔒 READ: Requires authentication (prevents exposure of customer PII)
+      // Admins access via Server Actions which bypass these rules
+      allow read: if request.auth != null;
+      
+      // 🔒 WRITE: Locked - all writes through Server Actions only
+      allow write: if false;
     }
   }
 }

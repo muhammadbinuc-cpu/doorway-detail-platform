@@ -43,14 +43,14 @@ export default function ClientProfile() {
         setCreatingJob(true);
         const res = await createJobFromClient(id);
         if (res.success) router.push("/admin");
-        else { alert(res.error); setCreatingJob(false); }
+        else { alert('error' in res ? res.error : 'Failed to create job'); setCreatingJob(false); }
     };
 
     const handleDelete = async () => {
         if (!confirm("⚠️ ARE YOU SURE? This will permanently delete this client.")) return;
         const res = await deleteClient(id);
         if (res.success) router.push("/admin/clients");
-        else alert(res.error);
+        else alert('error' in res ? res.error : 'Failed to delete client');
     };
 
     const handleSaveNotes = async () => {
@@ -114,7 +114,7 @@ export default function ClientProfile() {
                                             <p className="text-xs text-gray-400">{job.createdAt?.seconds ? new Date(job.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
                                         </div>
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${job.status === 'PAID' ? 'bg-green-100 text-green-700' :
-                                                job.status === 'INVOICED' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-800'
+                                            job.status === 'INVOICED' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-800'
                                             }`}>{job.status}</span>
                                     </div>
                                 ))}

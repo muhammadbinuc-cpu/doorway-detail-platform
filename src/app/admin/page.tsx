@@ -9,7 +9,8 @@ import { collection, onSnapshot, query, doc, orderBy, limit } from "firebase/fir
 import { Loader2, MapPin, Phone, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X, Truck, Repeat } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Link from "next/link";
-import { confirmBooking, updateJobStatus, emailInvoice, updateJobDetails, sendOnMyWay, createRecurringJob, deleteJob } from "../actions"; // ✅ Added deleteJob
+import { confirmBooking, updateJobStatus, emailInvoice, updateJobDetails, sendOnMyWay, createRecurringJob, deleteJob } from "../actions";
+import { JOB_WORKFLOW } from "@/lib/fsm_logic";
 
 interface Job {
     id: string;
@@ -26,7 +27,8 @@ interface Job {
 }
 
 const getNextStatuses = (currentStatus: string): string[] => {
-    return ['LEAD_RECEIVED', 'SCHEDULED', 'COMPLETED', 'INVOICED', 'PAID'];
+    const allowed = JOB_WORKFLOW[currentStatus] || [];
+    return [currentStatus, ...allowed];
 };
 
 export default function AdminPage() {
@@ -66,18 +68,18 @@ export default function AdminPage() {
     const chartData = [{ name: 'Leads', amount: jobs.filter(j => j.status === 'LEAD_RECEIVED').length * 150 }, { name: 'Scheduled', amount: jobs.filter(j => j.status === 'SCHEDULED').reduce((acc, j) => acc + (j.price || 0), 0) }, { name: 'Completed', amount: totalRevenue }];
 
     // ✅ SECURE: Use Server Action
-    const handleDelete = async (id: string) => { 
+    const handleDelete = async (id: string) => {
         if (confirm("Delete this job?")) {
             const res = await deleteJob(id);
-            if (!res.success) alert("Error: " + res.error);
+            if (!res.success) alert("Error: " + ('error' in res ? res.error : 'Unknown error'));
         }
     };
-    
-    const handleStatusUpdate = async (id: string, status: string) => { const res = await updateJobStatus(id, status); if (!res.success) alert("Error: " + res.error); };
+
+    const handleStatusUpdate = async (id: string, status: string) => { const res = await updateJobStatus(id, status); if (!res.success) alert("Error: " + ('error' in res ? res.error : 'Unknown error')); };
     const handlePrice = async (id: string, val: string) => { await updateJobDetails(id, { price: parseFloat(val) }); };
-    const handleSendInvoice = async (id: string) => { if (!confirm("Send Invoice Email?")) return; const res = await emailInvoice(id); if (res.success) alert("✅ Invoice Sent!"); else alert("Error: " + res.error); };
-    const handleOnMyWay = async (id: string) => { if (!confirm("Send SMS?")) return; const res = await sendOnMyWay(id); if (res.success) alert("✅ SMS Sent!"); else alert("Error: " + res.error); };
-    const handleRecurring = async (id: string) => { if (!confirm("Book again?")) return; const res = await createRecurringJob(id); if (res.success) alert("✅ Job Created!"); else alert("Error: " + res.error); };
+    const handleSendInvoice = async (id: string) => { if (!confirm("Send Invoice Email?")) return; const res = await emailInvoice(id); if (res.success) alert("✅ Invoice Sent!"); else alert("Error: " + ('error' in res ? res.error : 'Unknown error')); };
+    const handleOnMyWay = async (id: string) => { if (!confirm("Send SMS?")) return; const res = await sendOnMyWay(id); if (res.success) alert("✅ SMS Sent!"); else alert("Error: " + ('error' in res ? res.error : 'Unknown error')); };
+    const handleRecurring = async (id: string) => { if (!confirm("Book again?")) return; const res = await createRecurringJob(id); if (res.success) alert("✅ Job Created!"); else alert("Error: " + ('error' in res ? res.error : 'Unknown error')); };
 
     if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
     if (!user) return null;
@@ -149,7 +151,7 @@ export default function AdminPage() {
                         <p className="text-gray-500 text-sm mb-6">Select a date and time to confirm this booking and sync with Google Calendar.</p>
                         <input type="datetime-local" className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none ring-1 ring-gray-200 focus:ring-[#D4AF37] mb-6" onChange={(e) => { setScheduleDate(e.target.value); setSyncError(null); }} />
                         {syncError && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold mb-6">⚠️ {syncError}</div>}
-                        <div className="flex gap-4"><button onClick={() => { setIsScheduleModalOpen(false); setSyncError(null); }} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">Cancel</button><button onClick={async () => { if (schedulingJobId && scheduleDate) { setSyncingJobId(schedulingJobId); setSyncError(null); const result = await confirmBooking(schedulingJobId, scheduleDate); setSyncingJobId(null); if (result.success) { alert("✅ Scheduled!"); setIsScheduleModalOpen(false); } else { setSyncError(result.error); } } else { alert("Please select a date."); } }} disabled={!!syncingJobId} className="flex-1 bg-black text-white py-3 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-colors disabled:opacity-50">{syncingJobId ? <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={16} /> Syncing...</span> : "Confirm"}</button></div>
+                        <div className="flex gap-4"><button onClick={() => { setIsScheduleModalOpen(false); setSyncError(null); }} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">Cancel</button><button onClick={async () => { if (schedulingJobId && scheduleDate) { setSyncingJobId(schedulingJobId); setSyncError(null); const result = await confirmBooking(schedulingJobId, scheduleDate); setSyncingJobId(null); if (result.success) { alert("✅ Scheduled!"); setIsScheduleModalOpen(false); } else { setSyncError('error' in result ? (result.error ?? 'Unknown error') : 'Unknown error'); } } else { alert("Please select a date."); } }} disabled={!!syncingJobId} className="flex-1 bg-black text-white py-3 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-colors disabled:opacity-50">{syncingJobId ? <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={16} /> Syncing...</span> : "Confirm"}</button></div>
                     </motion.div>
                 </div>
             )}

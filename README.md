@@ -53,7 +53,7 @@ A modern, full-stack CRM platform built for service businesses. Features real-ti
 | **Styling** | Tailwind CSS, Lucide React Icons |
 | **Backend** | Firebase (Firestore, Authentication) |
 | **Charts** | Recharts |
-| **Deployment** | Vercel (Recommended) |
+| **Deployment** | Vercel |
 
 ---
 

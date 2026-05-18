@@ -65,7 +65,7 @@ export default function ClientsPage() {
             setNewClient({ name: "", email: "", phone: "", address: "", propertyNotes: "" });
             alert("✅ Client Added!");
         } else {
-            alert("❌ Failed: " + result.error);
+            alert("❌ Failed: " + ('error' in result ? result.error : 'Unknown error'));
         }
     };
 
@@ -147,7 +147,7 @@ export default function ClientsPage() {
                                                             alert("✅ Job created successfully!");
                                                             router.push("/admin");
                                                         } else {
-                                                            alert("❌ Failed: " + result.error);
+                                                            alert("❌ Failed: " + ('error' in result ? result.error : 'Failed to create job'));
                                                         }
                                                     }}
                                                     className="text-sm font-bold bg-black text-white px-3 py-1 rounded-lg hover:bg-[#D4AF37] hover:text-black transition-colors"
