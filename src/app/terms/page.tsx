@@ -17,7 +17,7 @@ export default function TermsPage() {
 
                     <h2 className="text-2xl font-bold text-white mt-8">Services</h2>
                     <p>
-                        Doorway Detail provides exterior cleaning services including window cleaning, gutter cleaning, and weed removal. We reserve the right to refuse service to anyone for any reason at any time.
+                        Doorway Detail provides exterior property services including window cleaning, pressure washing, landscaping, gutter cleaning, weed removal, and exterior detailing by request. We reserve the right to refuse service to anyone for any reason at any time.
                     </p>
 
                     <h2 className="text-2xl font-bold text-white mt-8">Pricing and Payment</h2>

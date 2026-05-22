@@ -1,28 +1,29 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Montserrat, DM_Sans } from "next/font/google";
 import "./globals.css";
 
-// 🔒 Environment validation - fail fast if critical vars are missing
 import { requireValidEnv } from "@/lib/env-validator";
 requireValidEnv();
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const montserrat = Montserrat({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["700", "800", "900"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dmSans = DM_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Doorway Detail | Premium Exterior Cleaning in Oakville",
-  description: "Expert window cleaning, pressure washing, and gutter detailing. Get an instant quote for your home today.",
+  title: "Doorway Detail | Exterior Home Detailing Across the GTA",
+  description: "Window cleaning, pressure washing, gutter cleaning, landscaping, and full exterior packages across the GTA. Free estimates and easy online quotes.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#D4AF37",
+  themeColor: "#C9A227",
 };
 
 export default function RootLayout({
@@ -32,9 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${montserrat.variable} ${dmSans.variable} antialiased`}>
         {children}
       </body>
     </html>

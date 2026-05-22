@@ -53,9 +53,14 @@ firebase deploy --only firestore:rules   # Deploy Firestore security rules
 ```
 src/
 ├── app/
-│   ├── layout.tsx               # Root layout — runs env validation, fonts, SEO
-│   ├── page.tsx                 # Landing page ("use client")
-│   ├── globals.css
+│   ├── layout.tsx               # Root layout — fonts (Playfair Display + DM Sans), env validation, SEO
+│   ├── page.tsx                 # Landing page ("use client") — imports from landing-parts.tsx
+│   ├── landing-parts.tsx        # ⭐ All landing page components + data:
+│   │                            #   Exports: BrandMark, ServicesSection, FaqAccordion, WorkerTeamFull
+│   │                            #   Data: trustChips, equipmentChips, processSteps, reassuranceItems, faqItems, fadeUp
+│   │                            #   Characters: WorkerWindowCleaner, WorkerPressureWasher, WorkerLandscaper,
+│   │                            #               WorkerGutterCleaner, WorkerTeamFull (inline SVG + Framer Motion)
+│   ├── globals.css              # Tailwind import, font CSS vars, gold CSS var (#C9A227)
 │   ├── not-found.tsx
 │   ├── actions.ts               # ⭐ ALL server actions — every mutation lives here
 │   │
@@ -67,7 +72,10 @@ src/
 │   │       └── [id]/page.tsx    # Client detail + job history
 │   │
 │   ├── login/page.tsx
-│   ├── quote/page.tsx           # Public quote form → submitQuote server action
+│   ├── quote/
+│   │   ├── page.tsx             # Public quote form → submitQuote server action
+│   │   ├── quote-options.ts     # serviceOptions array + buildServiceSummary() — edit here to add/rename services
+│   │   └── quote-panels.tsx     # QuoteIntro and QuoteSuccess components
 │   ├── invoice/[id]/page.tsx    # Public invoice (INVOICED/PAID status only)
 │   ├── privacy/page.tsx
 │   ├── terms/page.tsx
@@ -96,6 +104,21 @@ src/
 __tests__/
 └── fsm.test.ts                  # 10 FSM transition tests
 ```
+
+### Landing page section order (page.tsx)
+1. Nav — Services · How It Works · Why Doorway (3 links only, no Join the Team)
+2. Hero — headline + CTA + trust chips + WorkerTeamFull illustration
+3. Equipment credibility strip — commercial-grade equipment chips
+4. ServicesSection — interactive tab: click service → character animates
+5. How It Works — 3-step process cards
+6. "You're never left wondering" — text/arrival/invoice update cards
+7. Why Doorway — dark section, reassuranceItems grid
+8. Same-street discount — neighbour travel-fee-waiver callout
+9. Return client perks — returnPerks 2×2 grid
+10. Custom requests — open-ended CTA
+11. FAQ — FaqAccordion (5 questions)
+12. Contractors — hiring callout (not in nav)
+13. Footer + mobile sticky CTA bar
 
 ---
 
@@ -162,8 +185,14 @@ CANCELLED     → SCHEDULED  (reschedule)
 
 ### Styling
 - Tailwind CSS 4 — utility classes only
-- Color palette: Black `#000`, Gold `#D4AF37`, gray scale
-- Rounded: `rounded-2xl` or `rounded-3xl`
+- **Color system (three surfaces only — do not add new backgrounds):**
+  - Page base: `#FFFFFF` white — `<main>`, hero, nav
+  - Card surface: `#F5F4F0` warm light gray — cards, chips, form fields, secondary sections
+  - Dark: `#111111` — "Why Doorway" section + footer only
+- **Gold:** Primary `#C9A227` (CTAs, fills, active states) · Dark accent `#6B5010` (labels, icons, secondary text)
+- **CSS variable:** `--color-gold: #C9A227` defined in `globals.css`
+- **Fonts:** `Playfair Display` (headings h1/h2/h3, variable `--font-display`) · `DM Sans` (body/UI, variable `--font-sans`) — imported in `layout.tsx`
+- Rounded: `rounded-xl` or `rounded-2xl`
 - Animations: Framer Motion
 
 ### Key sanitization
@@ -183,9 +212,12 @@ CANCELLED     → SCHEDULED  (reschedule)
 2. **Geocoding defaults to mock** — `MOCK_GEOCODING=false` in env enables real Google Maps. Currently hardcodes Toronto coords.
 3. **`api/quotes/route.ts` is dead code** — uses client SDK with wrong field names (`customerName` vs `name`). Real flow is `submitQuote` server action. Don't use this route.
 4. **`services.ts` only has `logEvent`** — the rest was dead code and was removed. If Supabase isn't configured, logEvent silently no-ops.
-5. **Admin page is a single 160-line component** — major refactor target. Extract JobCard, KPI strip, RevenueChart, ScheduleModal, InvoiceSettingsModal.
+5. **Admin page is a single large component** — major refactor target. Extract JobCard, KPI strip, RevenueChart, ScheduleModal, InvoiceSettingsModal.
 6. **`alert()`/`confirm()` throughout admin** — replace with toast (sonner) when refactoring admin.
 7. **`public/` is empty** — no favicon, no OG image for social previews.
+8. **No real testimonials yet** — testimonials section intentionally removed. Add back when real Google reviews exist. Wire up Google Reviews embed or screenshot.
+9. **Before/after gallery missing** — high-conversion section, not built yet. Add when the team has real job photos. Placeholder slot exists in the plan.
+10. **Hover states in page.tsx use inline `onMouseEnter/Leave`** — because Tailwind 4 doesn't support arbitrary `hover:bg-[#hex]` with dynamic values. If refactoring, consider extracting button variants.
 
 ---
 

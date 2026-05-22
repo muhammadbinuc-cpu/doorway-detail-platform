@@ -1,524 +1,470 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useInView, useMotionValue, animate } from "framer-motion";
-import { useEffect, useRef } from "react";
-import type { LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
 import {
-  Sparkles, Droplets, Wind, Shield, ArrowRight, CheckCircle, Phone, Mail,
-  Leaf, Package, Zap, Home, BadgeCheck, CreditCard,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  CreditCard,
+  Mail,
+  MapPin,
+  Phone,
+  Zap,
 } from "lucide-react";
+import {
+  FaqAccordion,
+  JobLifecycleAnimation,
+  ServicesSection,
+  WorkerTeamFull,
+  equipmentChips,
+  processSteps,
+  reassuranceItems,
+  trustChips,
+} from "./landing-parts";
+import { BrandMark } from "./brand-mark";
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+const gold = "#C9A227";
+const dGold = "#6B5010";
 
-interface Service {
-  icon: LucideIcon;
-  title: string;
-  bullets: string[];
-  featured: boolean;
-}
-
-const SERVICES: Service[] = [
-  { icon: Droplets, title: "Pressure Washing",       bullets: ["Driveway", "Deck & Patio", "Siding & Fencing"],       featured: false },
-  { icon: Sparkles, title: "Window Cleaning",         bullets: ["Interior & Exterior", "Frames & Tracks", "Screens"],   featured: false },
-  { icon: Wind,     title: "Gutter Detail",           bullets: ["Full Cleanout", "Downspout Flush", "Visual Inspect"],  featured: false },
-  { icon: Leaf,     title: "Weed Removal",            bullets: ["Garden Beds", "Driveway Borders", "Walkways"],         featured: false },
-  { icon: Package,  title: "Full Exterior Package",   bullets: ["All 4 services bundled", "Best value — one visit", "Tailored to your property"], featured: true },
-];
-
-const WHY_US = [
-  { icon: Shield,     title: "Fully Insured",          desc: "We carry full liability. Your property is always protected." },
-  { icon: Leaf,       title: "Eco-Friendly",            desc: "Biodegradable products, safe for kids, pets, and gardens." },
-  { icon: Zap,        title: "Same-Day Response",       desc: "We don't leave you waiting. Expect a call back within hours." },
-  { icon: Home,       title: "Local Oakville Experts",  desc: "Oakville-based, not a franchise. We know your neighbourhood." },
-  { icon: BadgeCheck, title: "Satisfaction Guaranteed", desc: "Not happy? We come back and make it right. No questions." },
-  { icon: CreditCard, title: "Easy Online Payment",     desc: "Secure Stripe checkout from your phone. No cash needed." },
-];
-
-// TODO: Replace with real verified customer testimonials before marketing push
-const TESTIMONIALS = [
+const updateCards = [
   {
-    quote: "Doorway Detail transformed our driveway — it looks brand new. Professional, on time, and the pricing was completely transparent.",
-    name: "James T.",
-    location: "Oakville, ON",
+    icon: MapPin,
+    title: "On the way",
+    text: "We send clear arrival updates so you know when the crew is coming.",
   },
   {
-    quote: "Best window cleaning I've ever had. They cleaned the frames and screens too. Will 100% be using them every season.",
-    name: "Maria S.",
-    location: "Oakville, ON",
+    icon: CheckCircle2,
+    title: "Job done",
+    text: "You get a completion message when the exterior work is wrapped up.",
   },
   {
-    quote: "Gutters were completely clogged. They cleared everything and showed me before/after photos. Incredible service.",
-    name: "David K.",
-    location: "Oakville, ON",
+    icon: CreditCard,
+    title: "Digital invoice",
+    text: "Your invoice is easy to review and pay after the confirmed work is complete.",
   },
 ];
 
-const FAQ = [
-  { q: "Do I need to be home?",                       a: "No — we just need access to the areas being cleaned. We'll confirm all details with you before arrival." },
-  { q: "How long does it take?",                      a: "Most jobs take 1–3 hours depending on the scope. We'll give you a time estimate upfront." },
-  { q: "Are your products safe for pets & plants?",   a: "Yes. We use biodegradable, eco-certified products only. Safe for the whole family." },
+const returnPerks = [
+  {
+    value: "Smarter scheduling",
+    title: "Return bookings",
+    text: "Once we know the property, repeat visits are easier to scope and schedule.",
+  },
+  {
+    value: "Clear history",
+    title: "First access",
+    text: "Your past service notes help us quote the next visit with less back-and-forth.",
+  },
+  {
+    value: "Seasonal bundles",
+    title: "Spring & fall deals",
+    text: "Combine outside jobs into one practical quote when the timing makes sense.",
+  },
+  {
+    value: "Neighbour routes",
+    title: "Refer a neighbour",
+    text: "Nearby jobs can sometimes be routed together for better availability.",
+  },
 ];
-
-// ─── Shared animation variants ────────────────────────────────────────────────
-
-const cardContainer = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.1 } },
-};
-const cardItem = {
-  hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
-};
-
-// ─── Counter component ────────────────────────────────────────────────────────
-
-function Counter({ to, suffix = "" }: { to: number; suffix?: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const motionValue = useMotionValue(0);
-  const isInView = useInView(ref, { once: true });
-
-  useEffect(() => {
-    if (!isInView) return;
-    const controls = animate(motionValue, to, { duration: 1.5, ease: "easeOut" });
-    return controls.stop;
-  }, [isInView, to, motionValue]);
-
-  useEffect(() => {
-    return motionValue.on("change", (v) => {
-      if (ref.current) ref.current.textContent = Math.round(v) + suffix;
-    });
-  }, [motionValue, suffix]);
-
-  return <span ref={ref}>0{suffix}</span>;
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-black text-white overflow-x-hidden">
+    <main className="min-h-screen overflow-x-hidden bg-white text-[#111111]">
 
-      {/* ── Navigation ── */}
-      <nav className="fixed top-0 w-full z-50 backdrop-blur-lg bg-black/80 border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-2xl font-black italic tracking-tight"
-          >
-            DOORWAY <span className="text-[#D4AF37]">DETAIL</span>
-          </motion.div>
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <Link href="/login" className="text-sm text-gray-400 hover:text-white transition-colors">
-              Staff Login
-            </Link>
-          </motion.div>
-        </div>
-      </nav>
-
-      {/* ── Hero ── */}
-      <section className="relative min-h-screen flex items-center justify-center px-6 pt-20 overflow-hidden">
-        {/* Background depth layers */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.12)_0%,_transparent_65%)] pointer-events-none" />
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-[#D4AF37]/10 blur-[140px] pointer-events-none" />
-        <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] rounded-full bg-[#D4AF37]/8 blur-[120px] pointer-events-none" />
-
-        <div className="relative max-w-5xl mx-auto text-center z-10">
-          {/* Word-by-word headline */}
-          <div className="mb-6 overflow-hidden">
-            <h1 className="text-6xl md:text-8xl font-black leading-tight tracking-tight flex flex-wrap justify-center gap-x-5">
-              {["Detail", "Done"].map((word, i) => (
-                <motion.span
-                  key={word}
-                  initial={{ opacity: 0, y: 80 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.7, delay: i * 0.12, ease: [0.16, 1, 0.3, 1] }}
-                  className="inline-block"
-                >
-                  {word}
-                </motion.span>
-              ))}
-              <motion.span
-                initial={{ opacity: 0, y: 80 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
-                className="inline-block text-[#D4AF37] italic"
-              >
-                Flawlessly
-              </motion.span>
-            </h1>
-          </div>
-
-          <motion.p
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.45 }}
-            className="text-xl md:text-2xl text-gray-400 mb-10 max-w-3xl mx-auto leading-relaxed"
-          >
-            Premium exterior cleaning for homeowners in Glen Abbey, Bronte, and Old Oakville.
-            Pressure washing, window cleaning, gutter detailing — done right, every time.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-          >
-            <Link
-              href="/quote"
-              className="group bg-[#D4AF37] text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-white transition-all flex items-center gap-2 shadow-xl shadow-[#D4AF37]/25 hover:shadow-2xl hover:shadow-[#D4AF37]/35 transform hover:scale-105"
-            >
-              Get Free Estimate
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
-            </Link>
-            <a
-              href="tel:289-772-5757"
-              className="border-2 border-white/20 text-white px-8 py-4 rounded-full font-bold text-lg hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all flex items-center gap-2"
-            >
-              <Phone size={18} />
-              Call 289-772-5757
+      {/* ── NAV ── */}
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-black/8 bg-white/92 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4 lg:px-8">
+          <Link href="/" aria-label="Doorway Detail home" className="text-base text-black sm:text-lg">
+            <BrandMark />
+          </Link>
+          <nav className="hidden items-center gap-7 text-sm font-semibold text-black/60 lg:flex">
+            <a href="#services" className="transition hover:text-black">Services</a>
+            <a href="#how-it-works" className="transition hover:text-black">How It Works</a>
+            <a href="#why-doorway" className="transition hover:text-black">Why Doorway</a>
+          </nav>
+          <div className="hidden items-center gap-3 md:flex">
+            <a href="tel:289-772-5757" className="inline-flex items-center gap-2 text-sm font-bold text-black/65 transition hover:text-black">
+              <Phone size={16} />
+              289-772-5757
             </a>
-          </motion.div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.85 }}
-            className="text-sm text-gray-500 mt-6 tracking-wide"
-          >
-            ✓ No deposit required &nbsp;·&nbsp; ✓ Free estimates &nbsp;·&nbsp; ✓ Same-day response
-          </motion.p>
+            <Link href="/quote" className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-3 text-sm font-black text-white transition hover:bg-[#C9A227] hover:text-black">
+              Get a Quote
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+          <Link href="/quote" className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-3 text-sm font-black text-white md:hidden">
+            Quote
+            <ArrowRight size={15} />
+          </Link>
         </div>
-      </section>
+      </header>
 
-      {/* ── Stats Bar ── */}
-      <section className="bg-[#D4AF37] text-black py-12 px-6">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      {/* ── HERO ── */}
+      <section className="px-5 pb-16 pt-24 sm:pt-32 lg:px-8 lg:pb-24">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <p className="text-5xl font-black"><Counter to={50} suffix="+" /></p>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-60 mt-1">Homes Cleaned</p>
-          </div>
-          <div>
-            <p className="text-5xl font-black">5.0★</p>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-60 mt-1">Rated</p>
-          </div>
-          <div>
-            <p className="text-5xl font-black"><Counter to={100} suffix="%" /></p>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-60 mt-1">Satisfaction</p>
-          </div>
-          <div>
-            <p className="text-5xl font-black">Local</p>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-60 mt-1">Based & Insured</p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Services Grid ── */}
-      <section className="py-24 px-6 bg-zinc-950">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-5xl font-black mb-4 tracking-tight">
-              Our <span className="text-[#D4AF37]">Services</span>
-            </h2>
-            <p className="text-gray-400 text-lg">Transforming your home's exterior with meticulous care</p>
-          </motion.div>
-
-          {/* 4 standard cards */}
-          <motion.div
-            variants={cardContainer}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
-          >
-            {SERVICES.filter((s) => !s.featured).map((service) => (
-              <motion.div
-                key={service.title}
-                variants={cardItem}
-                whileHover={{ scale: 1.03, y: -6 }}
-                className="group bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-3xl p-7 hover:border-[#D4AF37]/50 transition-all flex flex-col"
+            <p className="mb-5 text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+              Exterior home detailing across the GTA
+            </p>
+            <h1 className="max-w-3xl text-4xl font-black leading-[1.05] text-black sm:text-6xl lg:text-7xl">
+              Spotless Exteriors,<br />Done the Right Way.
+            </h1>
+            <p className="mt-6 max-w-2xl text-base leading-7 text-black/65 sm:text-xl sm:leading-8">
+              We&apos;re not a general handyman service. We specialize in exterior cleaning — water-fed
+              pole systems for windows, commercial-grade pressure washers, and proper gutter equipment.
+              Every crew is matched to the job.
+            </p>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link href="/quote"
+                className="inline-flex items-center justify-center gap-2 rounded-lg px-6 py-4 text-base font-black text-black shadow-lg transition hover:bg-black hover:text-white"
+                style={{ backgroundColor: gold }}
               >
-                <div className="bg-[#D4AF37]/10 w-14 h-14 rounded-2xl flex items-center justify-center mb-5 group-hover:bg-[#D4AF37] transition-colors">
-                  <service.icon className="text-[#D4AF37] group-hover:text-black transition-colors" size={26} />
-                </div>
-                <h3 className="text-xl font-bold mb-3">{service.title}</h3>
-                <ul className="space-y-2 mb-6 flex-1">
-                  {service.bullets.map((b) => (
-                    <li key={b} className="text-gray-400 text-sm flex items-center gap-2">
-                      <span className="text-[#D4AF37] font-bold text-xs">✓</span>
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/quote"
-                  className="text-[#D4AF37] text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
+                Get a Quote
+                <ArrowRight size={19} />
+              </Link>
+              <a href="tel:289-772-5757"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/20 bg-white px-6 py-4 text-base font-black text-black transition hover:border-black"
+              >
+                <Phone size={18} />
+                Call or Text
+              </a>
+            </div>
+            <div className="mt-8 flex flex-wrap gap-2">
+              {trustChips.map((chip) => (
+                <span key={chip} className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-[#F5F4F0] px-3 py-2 text-sm font-bold text-black/70 shadow-sm">
+                  <Check size={14} style={{ color: dGold }} />
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Hero illustration */}
+          <div className="flex min-h-[360px] items-end justify-center overflow-hidden rounded-2xl border border-black/10 bg-[#F5F4F0] px-6 pb-0 pt-8">
+            <WorkerTeamFull />
+          </div>
+        </div>
+      </section>
+
+      {/* ── EQUIPMENT CREDIBILITY STRIP ── */}
+      <section className="border-y border-black/8 bg-[#F5F4F0] px-5 py-10 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
+                Proper tools for every surface
+              </p>
+              <p className="mt-2 max-w-3xl text-base font-bold leading-7 text-black">
+                We don&apos;t show up with consumer gear. Water-fed pole systems for upper floors, commercial
+                hot-water pressure washers, soft-wash for delicate surfaces, and dedicated gutter flush tools —
+                the right equipment for the surface.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {equipmentChips.map((chip) => (
+                <span key={chip}
+                  className="inline-flex items-center gap-2 rounded-full border border-black/12 bg-white px-4 py-2 text-sm font-bold text-black/75"
                 >
-                  Get a Quote <ArrowRight size={14} />
-                </Link>
+                  <Zap size={14} style={{ color: dGold }} />
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SERVICES (interactive tab section) ── */}
+      <ServicesSection />
+
+      {/* ── HOW IT WORKS ── */}
+      <section id="how-it-works" className="scroll-mt-24 bg-[#F5F4F0] px-5 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 max-w-2xl">
+            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>How it works</p>
+            <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">From quote to clean — here&apos;s how it works.</h2>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {processSteps.map((step, index) => (
+              <motion.div
+                key={step.title}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.08 }}
+                className="rounded-xl border border-black/10 bg-white p-6 shadow-sm"
+              >
+                <div className="mb-8 flex items-center justify-between">
+                  <step.icon size={26} style={{ color: dGold }} />
+                  <span className="text-4xl font-black text-black/10">0{index + 1}</span>
+                </div>
+                <h3 className="text-xl font-black text-black">{step.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-black/65">{step.text}</p>
               </motion.div>
             ))}
-          </motion.div>
+          </div>
+        </div>
+      </section>
 
-          {/* Featured Full Exterior Package */}
-          {SERVICES.filter((s) => s.featured).map((service) => (
-            <motion.div
-              key={service.title}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="relative bg-gradient-to-r from-[#D4AF37]/10 via-[#D4AF37]/5 to-transparent border-2 border-[#D4AF37]/40 rounded-3xl p-10 flex flex-col md:flex-row items-center justify-between gap-8 hover:border-[#D4AF37]/70 transition-all"
-            >
-              <div className="absolute top-5 right-5 bg-[#D4AF37] text-black text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                Most Popular
+      {/* ── HOW WE KEEP YOU UPDATED ── */}
+      <section className="px-5 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 max-w-2xl">
+            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+              Always in the loop
+            </p>
+            <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
+              You&apos;re never left wondering.
+            </h2>
+          </div>
+          <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+            <div className="grid gap-5 sm:grid-cols-3 lg:grid-cols-1">
+              {updateCards.map((card, i) => (
+                <motion.div
+                  key={card.title}
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.08 }}
+                  className="rounded-xl border border-black/10 bg-[#F5F4F0] p-6"
+                >
+                  <card.icon size={26} style={{ color: dGold }} />
+                  <h3 className="mt-4 text-xl font-black text-black">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-black/65">{card.text}</p>
+                </motion.div>
+              ))}
+            </div>
+            <JobLifecycleAnimation />
+          </div>
+        </div>
+      </section>
+
+      {/* ── WHY DOORWAY ── */}
+      <section id="why-doorway" className="scroll-mt-24 bg-[#111111] px-5 py-20 text-white lg:px-8 lg:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: gold }}>Why Doorway</p>
+            <h2 className="mt-3 text-4xl font-black text-white sm:text-5xl">
+              One team for the outside jobs you keep putting off.
+            </h2>
+            <p className="mt-5 text-base leading-7 text-white/60">
+              No bait-and-switch pricing, no vague quotes. We confirm the scope first, bring the proper
+              equipment, and follow up once it&apos;s done. That&apos;s the whole process.
+            </p>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {reassuranceItems.map((item) => (
+              <div key={item.title} className="rounded-xl border border-white/10 bg-white/[0.04] p-6">
+                <item.icon size={26} style={{ color: gold }} />
+                <h3 className="mt-5 text-xl font-black">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/60">{item.text}</p>
               </div>
-              <div className="flex items-start gap-6">
-                <div className="bg-[#D4AF37] w-16 h-16 rounded-2xl flex items-center justify-center shrink-0">
-                  <service.icon className="text-black" size={30} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black mb-3">{service.title}</h3>
-                  <ul className="flex flex-wrap gap-5">
-                    {service.bullets.map((b) => (
-                      <li key={b} className="text-gray-300 text-sm flex items-center gap-2">
-                        <span className="text-[#D4AF37] font-bold">✓</span>
-                        {b}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── SAME-STREET DISCOUNT ── */}
+      <section className="px-5 py-16 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div
+            className="rounded-2xl border-2 p-8 lg:p-10"
+            style={{ borderColor: gold, backgroundColor: `${gold}12` }}
+          >
+            <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
+                  Neighbour routing
+                </p>
+                <h2 className="mt-3 text-3xl font-black text-black">
+                  Working on your street? Let us know.
+                </h2>
+                <p className="mt-4 max-w-2xl text-base leading-7 text-black/65">
+                  If homes on your street or block want service around the same time, let us know when
+                  you quote. We can often route jobs together and reflect that in the pricing.
+                </p>
               </div>
               <Link
                 href="/quote"
-                className="shrink-0 bg-[#D4AF37] text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-white transition-all flex items-center gap-2 shadow-lg shadow-[#D4AF37]/20"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-black px-6 py-4 font-black text-white transition hover:bg-[#C9A227] hover:text-black"
               >
-                Book the Package <ArrowRight size={20} />
+                Submit a quote
+                <ArrowRight size={18} />
               </Link>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── How It Works ── */}
-      <section className="py-24 px-6 bg-black">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-5xl font-black tracking-tight">
-              As Easy As <span className="text-[#D4AF37]">1, 2, 3</span>
-            </h2>
-          </motion.div>
-
-          <div className="relative">
-            {/* Connecting line — desktop only */}
-            <div className="hidden md:block absolute top-6 left-[16%] right-[16%] h-px bg-gradient-to-r from-[#D4AF37]/20 via-[#D4AF37]/50 to-[#D4AF37]/20" />
-
-            <motion.div
-              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.2 } } }}
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true }}
-              className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center"
-            >
-              {[
-                { n: "1", title: "Submit a Quote",      lines: ["2-min form online.", "No deposit, no commitment."] },
-                { n: "2", title: "We Schedule",          lines: ["We call you within hours.", "You pick the date and time."] },
-                { n: "3", title: "Enjoy the Results",    lines: ["We do the work.", "Pay securely online."] },
-              ].map((step) => (
-                <motion.div
-                  key={step.n}
-                  variants={{ hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0, transition: { duration: 0.6 } } }}
-                  className="flex flex-col items-center"
-                >
-                  <div className="w-12 h-12 rounded-full bg-[#D4AF37] text-black font-black text-xl flex items-center justify-center mb-6 relative z-10 shadow-lg shadow-[#D4AF37]/30">
-                    {step.n}
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-3">{step.title}</h3>
-                  {step.lines.map((l) => (
-                    <p key={l} className="text-gray-400 text-sm leading-relaxed">{l}</p>
-                  ))}
-                </motion.div>
-              ))}
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Why Choose Us ── */}
-      <section className="py-24 px-6 bg-zinc-950">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-5xl font-black tracking-tight">
-              Why Oakville Homeowners{" "}
-              <span className="text-[#D4AF37]">Choose Us</span>
-            </h2>
-          </motion.div>
-
-          <motion.div
-            variants={cardContainer}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {WHY_US.map((item) => (
-              <motion.div
-                key={item.title}
-                variants={cardItem}
-                className="bg-black border border-white/10 rounded-3xl p-6 hover:border-[#D4AF37]/40 transition-all"
+      {/* ── RETURN CLIENT PERKS ── */}
+      <section className="bg-[#F5F4F0] px-5 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+                Return clients
+              </p>
+              <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
+                Better every time you book.
+              </h2>
+              <p className="mt-5 text-base leading-7 text-black/65">
+                Repeat bookings cost less to plan and route — and we pass that on. Return clients also get
+                first access to open time slots before they&apos;re advertised. First in, always.
+              </p>
+              <Link
+                href="/quote"
+                className="mt-7 inline-flex items-center gap-2 rounded-lg bg-black px-6 py-4 font-black text-white transition hover:bg-[#C9A227] hover:text-black"
               >
-                <div className="bg-[#D4AF37]/10 rounded-xl p-3 w-fit mb-4">
-                  <item.icon className="text-[#D4AF37]" size={22} />
+                Get your first quote
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {returnPerks.map((perk) => (
+                <div key={perk.title} className="rounded-xl border border-black/10 bg-white p-5">
+                  <p className="text-lg font-black" style={{ color: gold }}>{perk.value}</p>
+                  <h3 className="mt-1 font-black text-black">{perk.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-black/60">{perk.text}</p>
                 </div>
-                <h3 className="font-bold text-lg mb-2">{item.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Testimonials ── */}
-      <section className="py-24 px-6 bg-black">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-5xl font-black tracking-tight">
-              What Our <span className="text-[#D4AF37]">Clients Say</span>
-            </h2>
-          </motion.div>
-
-          <motion.div
-            variants={cardContainer}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
-          >
-            {TESTIMONIALS.map((t) => (
-              <motion.div
-                key={t.name}
-                variants={cardItem}
-                className="bg-zinc-900 border border-white/10 rounded-3xl p-8 flex flex-col"
-              >
-                <div className="text-8xl text-[#D4AF37]/20 font-black leading-none mb-1 select-none">&ldquo;</div>
-                <p className="text-[#D4AF37] text-lg mb-4 tracking-wide">★★★★★</p>
-                <p className="text-gray-300 italic leading-relaxed flex-1 mb-6">&ldquo;{t.quote}&rdquo;</p>
-                <div>
-                  <p className="font-bold text-white">{t.name}</p>
-                  <p className="text-gray-500 text-sm">{t.location}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Trust + FAQ ── */}
-      <section className="py-24 px-6 bg-zinc-950">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <h3 className="text-3xl font-black mb-8">
-              Our <span className="text-[#D4AF37]">Promise</span>
-            </h3>
-            <ul className="space-y-5">
-              {["Fully Insured", "Eco-Friendly Products", "Satisfaction Guaranteed", "Licensed & Local"].map((badge) => (
-                <li key={badge} className="flex items-center gap-3 text-lg font-medium">
-                  <CheckCircle className="text-[#D4AF37] shrink-0" size={22} />
-                  {badge}
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <h3 className="text-3xl font-black mb-8">
-              Common <span className="text-[#D4AF37]">Questions</span>
-            </h3>
-            <div className="divide-y divide-white/10">
-              {FAQ.map((item) => (
-                <details key={item.q} className="py-4 group">
-                  <summary className="cursor-pointer text-[#D4AF37] font-bold list-none flex justify-between items-center hover:opacity-80 transition-opacity">
-                    {item.q}
-                    <span className="text-white/40 group-open:rotate-45 transition-transform inline-block text-xl font-light leading-none">+</span>
-                  </summary>
-                  <p className="text-gray-400 text-sm leading-relaxed mt-3">{item.a}</p>
-                </details>
               ))}
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="bg-zinc-950 border-t border-white/10 py-16 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center text-center gap-8 mb-12">
-            <h2 className="text-4xl font-bold tracking-tight">Ready to Transform Your Home?</h2>
-            <div className="flex flex-col sm:flex-row gap-4">
+      {/* ── CUSTOM REQUESTS ── */}
+      <section className="px-5 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+              Custom requests
+            </p>
+            <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
+              Something else on the outside of your home?
+            </h2>
+            <p className="mt-5 max-w-3xl text-base leading-7 text-black/60">
+              If it&apos;s exterior and it fits the crew, send it through. We&apos;ll tell you straight —
+              what we can handle, what needs a specialist, and what&apos;s worth quoting.
+            </p>
+          </div>
+          <Link
+            href="/quote"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-black px-6 py-4 font-black text-white transition hover:bg-[#C9A227] hover:text-black"
+          >
+            Tell us what you need
+            <ArrowRight size={18} />
+          </Link>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="bg-[#F5F4F0] px-5 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>FAQ</p>
+              <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
+                Common questions.
+              </h2>
+              <p className="mt-5 text-base leading-7 text-black/60">
+                Still not sure? Call or text us at{" "}
+                <a href="tel:289-772-5757" className="font-bold text-black hover:underline">
+                  289-772-5757
+                </a>{" "}
+                and we&apos;ll answer directly.
+              </p>
+            </div>
+            <FaqAccordion />
+          </div>
+        </div>
+      </section>
+
+      {/* ── CONTRACTORS ── */}
+      <section className="px-5 py-14 lg:px-8">
+        <div className="mx-auto max-w-7xl rounded-xl border border-black/10 bg-[#F5F4F0] p-6 lg:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
+                Contractors
+              </p>
+              <h2 className="mt-2 text-2xl font-black text-black">Join the Doorway Detail team.</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-black/60">
+                We work with reliable contractors as the company grows. If you care about clean work,
+                communication, and showing up prepared, reach out.
+              </p>
+            </div>
+            <a
+              href="mailto:doorwaydetail@gmail.com"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-black/15 bg-white px-5 py-4 font-black text-black transition hover:border-black"
+            >
+              <Mail size={18} />
+              doorwaydetail@gmail.com
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="bg-[#111111] px-5 pb-28 pt-16 text-white md:pb-16 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <BrandMark className="text-white" />
+              <p className="mt-4 max-w-xl text-sm leading-6 text-white/50">
+                Professional exterior cleaning with a quote-first booking process. Windows, gutters,
+                pressure washing, and landscaping — across the GTA.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/quote"
+                className="inline-flex items-center justify-center gap-2 rounded-lg px-6 py-4 font-black text-black transition hover:bg-white"
+                style={{ backgroundColor: gold }}
+              >
+                Get a Quote
+                <ArrowRight size={18} />
+              </Link>
               <a
                 href="tel:289-772-5757"
-                className="flex items-center justify-center gap-3 bg-[#D4AF37] text-black px-8 py-4 rounded-full font-bold hover:bg-white transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 px-6 py-4 font-black text-white transition hover:border-white/50"
               >
-                <Phone size={20} />
-                Call: 289-772-5757
-              </a>
-              <a
-                href="mailto:Doorwaydetail@gmail.com"
-                className="flex items-center justify-center gap-3 border-2 border-white/20 text-white px-8 py-4 rounded-full font-bold hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all"
-              >
-                <Mail size={20} />
-                Email Us
+                <Phone size={18} />
+                289-772-5757
               </a>
             </div>
           </div>
-
-          <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+          <div className="mt-10 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-white/40 md:flex-row md:items-center md:justify-between">
             <p>&copy; {new Date().getFullYear()} Doorway Detail. All rights reserved.</p>
             <div className="flex gap-6">
-              <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+              <Link href="/privacy" className="transition hover:text-white">Privacy Policy</Link>
+              <Link href="/terms" className="transition hover:text-white">Terms of Service</Link>
+              <Link href="/login" className="transition hover:text-white">Staff Login</Link>
             </div>
-            <p className="italic">Detail Done Flawlessly</p>
           </div>
         </div>
       </footer>
 
-    </div>
+      {/* ── MOBILE STICKY CTA ── */}
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-black/10 bg-white/95 p-3 shadow-lg backdrop-blur md:hidden">
+        <div className="grid grid-cols-2 gap-3">
+          <Link
+            href="/quote"
+            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-black text-black"
+            style={{ backgroundColor: gold }}
+          >
+            Get Quote
+            <ArrowRight size={16} />
+          </Link>
+          <a
+            href="tel:289-772-5757"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#111111] px-4 py-3 text-sm font-black text-white"
+          >
+            <Phone size={16} />
+            Call
+          </a>
+        </div>
+      </div>
+    </main>
   );
 }
