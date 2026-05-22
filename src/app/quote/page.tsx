@@ -16,13 +16,14 @@ import {
 import { submitQuote } from "../actions";
 import { BrandMark } from "../brand-mark";
 import { QuoteIntro, QuoteSuccess } from "./quote-panels";
-import { buildServiceSummary, serviceOptions } from "./quote-options";
+import { buildServiceSummary, serviceOptions, FULL_EXTERIOR } from "./quote-options";
 
 export default function QuotePage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [selectedDetails, setSelectedDetails] = useState<string[]>([]);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [serviceError, setServiceError] = useState(false);
   const [notes, setNotes] = useState("");
 
   const [formData, setFormData] = useState({
@@ -30,24 +31,23 @@ export default function QuotePage() {
     email: "",
     phone: "",
     address: "",
-    service: "Window Cleaning",
   });
-
-  const activeService = serviceOptions.find((service) => service.title === formData.service) ?? serviceOptions[0];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleServiceSelect = (service: string) => {
-    setFormData({ ...formData, service });
-    setSelectedDetails([]);
-  };
-
-  const toggleDetail = (detail: string) => {
-    setSelectedDetails((current) =>
-      current.includes(detail) ? current.filter((item) => item !== detail) : [...current, detail]
-    );
+  const toggleService = (service: string) => {
+    setServiceError(false);
+    setSelectedServices((current) => {
+      const has = current.includes(service);
+      // Full Exterior is mutually exclusive with the individual services.
+      if (service === FULL_EXTERIOR) {
+        return has ? [] : [FULL_EXTERIOR];
+      }
+      const withoutFull = current.filter((s) => s !== FULL_EXTERIOR);
+      return has ? withoutFull.filter((s) => s !== service) : [...withoutFull, service];
+    });
   };
 
   const handleNext = (e: React.FormEvent) => {
@@ -62,11 +62,15 @@ export default function QuotePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedServices.length === 0) {
+      setServiceError(true);
+      return;
+    }
     setLoading(true);
 
     const quotePayload = {
       ...formData,
-      service: buildServiceSummary(formData.service, selectedDetails, notes),
+      service: buildServiceSummary(selectedServices, notes),
     };
 
     try {
@@ -184,7 +188,7 @@ export default function QuotePage() {
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-3xl font-black">Service details</h2>
-                    <p className="mt-2 text-sm text-black/58">Pick the main service and any details you already know.</p>
+                    <p className="mt-2 text-sm text-black/58">Pick one or more services — or the full package.</p>
                   </div>
 
                   <div>
@@ -205,46 +209,42 @@ export default function QuotePage() {
                   </div>
 
                   <div>
-                    <label className="mb-3 block text-sm font-black text-black/65">Main Service *</label>
+                    <div className="mb-3 flex items-center justify-between">
+                      <label className="block text-sm font-black text-black/65">
+                        Services * <span className="font-semibold text-black/40">(select any)</span>
+                      </label>
+                      {selectedServices.length > 0 && (
+                        <span className="text-xs font-bold text-[#6B5010]">
+                          {selectedServices.length} selected
+                        </span>
+                      )}
+                    </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {serviceOptions.map((service) => (
-                        <button
-                          key={service.title}
-                          type="button"
-                          onClick={() => handleServiceSelect(service.title)}
-                          className={`rounded-lg border p-4 text-left transition ${
-                            formData.service === service.title
-                              ? "border-[#C9A227] bg-[#C9A227] text-black"
-                              : "border-black/10 bg-[#f8f5ee] text-black/68 hover:border-black/35"
-                          }`}
-                        >
-                          <span className="flex items-center gap-3 font-black">
-                            <Sparkles size={18} />
-                            {service.title}
-                          </span>
-                        </button>
-                      ))}
+                      {serviceOptions.map((service) => {
+                        const isSelected = selectedServices.includes(service.title);
+                        return (
+                          <button
+                            key={service.title}
+                            type="button"
+                            onClick={() => toggleService(service.title)}
+                            aria-pressed={isSelected}
+                            className={`rounded-lg border p-4 text-left transition ${
+                              isSelected
+                                ? "border-[#C9A227] bg-[#C9A227] text-black"
+                                : "border-black/10 bg-[#f8f5ee] text-black/68 hover:border-black/35"
+                            }`}
+                          >
+                            <span className="flex items-center gap-3 font-black">
+                              <Sparkles size={18} />
+                              {service.title}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-3 block text-sm font-black text-black/65">Helpful Details</label>
-                    <div className="flex flex-wrap gap-2">
-                      {activeService.details.map((detail) => (
-                        <button
-                          key={detail}
-                          type="button"
-                          onClick={() => toggleDetail(detail)}
-                          className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${
-                            selectedDetails.includes(detail)
-                              ? "border-black bg-black text-white"
-                              : "border-black/10 bg-white text-black/62 hover:border-black/30"
-                          }`}
-                        >
-                          {detail}
-                        </button>
-                      ))}
-                    </div>
+                    {serviceError && (
+                      <p className="mt-3 text-sm font-bold text-red-600">Pick at least one service.</p>
+                    )}
                   </div>
 
                   <div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import {
   ArrowRight,
   BadgeCheck,
@@ -20,7 +21,6 @@ import Link from "next/link";
 
 const gold = "#C9A227";
 const dGold = "#6B5010";
-const skin = "#F5C89A";
 const K = "#111111";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export const trustChips = [
   "Clear updates",
   "No upfront payment",
   "Insured",
-  "GTA service area",
+  "GTA + KW service area",
 ];
 
 export const equipmentChips = [
@@ -46,17 +46,17 @@ export const processSteps = [
   {
     icon: ClipboardList,
     title: "Request a quote",
-    text: "Send the service, address, and any details. Takes 2 minutes.",
+    text: "Send service + address. 2 minutes.",
   },
   {
     icon: MessageCircle,
     title: "We confirm the scope",
-    text: "We call or text back fast — confirming the work, timing, access needs, and what to expect on the day.",
+    text: "Quick call or text to lock the work and timing.",
   },
   {
     icon: CalendarCheck,
     title: "We show up prepared",
-    text: "The right equipment for the task, careful work, and a digital invoice sent as soon as we're done.",
+    text: "Right equipment, careful work, digital invoice when done.",
   },
 ];
 
@@ -64,22 +64,22 @@ export const reassuranceItems = [
   {
     icon: ShieldCheck,
     title: "Professional standards",
-    text: "We confirm the scope clearly, use the right equipment, and leave the work area tidy.",
+    text: "Clear scope, proper gear, tidy worksite.",
   },
   {
     icon: BadgeCheck,
     title: "Clear communication",
-    text: "We keep you updated before arrival, after completion, and when the invoice is ready.",
+    text: "Updates before, during, and after the job.",
   },
   {
     icon: Zap,
     title: "Proper equipment",
-    text: "Water-fed poles, commercial pressure washers, soft-wash systems. We bring what the job actually needs — not whatever fits in a van.",
+    text: "Commercial-grade tools for every surface.",
   },
   {
     icon: Tag,
     title: "Better every visit",
-    text: "Return clients get priority scheduling, seasonal bundle recommendations, and a crew that already knows the property.",
+    text: "Repeat clients get priority slots and faster quotes.",
   },
 ];
 
@@ -94,7 +94,7 @@ export const faqItems = [
   },
   {
     q: "What areas do you serve?",
-    a: "We serve homes across the GTA, including Oakville, Mississauga, Burlington, Brampton, Hamilton, and nearby areas.",
+    a: "We serve homes across the GTA and the Kitchener-Waterloo area, including Oakville, Mississauga, Burlington, Hamilton, Kitchener, Waterloo, and Cambridge.",
   },
   {
     q: "How do I pay?",
@@ -106,7 +106,7 @@ export const faqItems = [
   },
   {
     q: "What equipment do you use?",
-    a: "Depends on the job. Windows get water-fed pole systems for upper floors and traditional squeegees for lower. Pressure washing uses commercial-grade hot-water machines. Gutters get proper flush attachments. We don't use consumer hardware on client properties.",
+    a: "Depends on the job. Windows are cleaned with water-fed pole systems on every floor (safer than ladders and reaches second- and third-storey panes easily). Pressure washing uses commercial-grade hot-water machines. Gutters get proper flush attachments. We don't use consumer hardware on client properties.",
   },
 ];
 
@@ -162,257 +162,76 @@ export function FaqAccordion() {
   );
 }
 
-// ─── CHARACTER SVGs ───────────────────────────────────────────────────────────
-// All use viewBox="0 0 300 360". Character centered at x=150, head at cy=68.
+// ─── CHARACTER COMPONENTS (PNG-based, brand-matched) ─────────────────────────
+// Source PNGs are trimmed + alpha-keyed crew illustrations.
+// Each is wrapped in motion.div for an idle vertical bob.
+
+const bob = {
+  animate: { y: [0, -8, 0] },
+  transition: { duration: 3, repeat: Infinity, ease: "easeInOut" as const },
+};
+
+type CharSize = { w: number; h: number };
+const CHAR_SIZE: Record<string, CharSize> = {
+  "/workers/window-v3.png": { w: 856, h: 909 },
+  "/workers/pressure-v3.png": { w: 791, h: 720 },
+  "/workers/landscaping-v3.png": { w: 776, h: 735 },
+  "/workers/gutter-v3.png": { w: 791, h: 613 },
+};
+
+function CharacterImage({ src, alt, priority = false }: { src: string; alt: string; priority?: boolean }) {
+  const size = CHAR_SIZE[src] ?? { w: 600, h: 800 };
+  return (
+    <motion.div
+      animate={bob.animate}
+      transition={bob.transition}
+      className="flex h-full w-full items-center justify-center"
+    >
+      <Image
+        src={src}
+        alt={alt}
+        width={size.w}
+        height={size.h}
+        priority={priority}
+        className="h-full w-auto max-w-full object-contain"
+      />
+    </motion.div>
+  );
+}
 
 function WorkerWindowCleaner() {
-  return (
-    <svg viewBox="0 0 300 360" className="h-full w-full" aria-hidden="true">
-      {/* Window pane */}
-      <rect x="188" y="45" width="100" height="128" rx="4" fill="white" stroke={K} strokeWidth="3.5" />
-      <line x1="238" y1="45" x2="238" y2="173" stroke={K} strokeWidth="2.5" />
-      <line x1="188" y1="109" x2="288" y2="109" stroke={K} strokeWidth="2.5" />
-      <path d="M196 56 L212 56 L196 78Z" fill="white" opacity="0.55" />
-      {/* Animated squeegee arm */}
-      <motion.g
-        animate={{ rotate: [-20, 6, -20] }}
-        style={{ transformOrigin: "192px 130px" }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <line x1="192" y1="130" x2="253" y2="72" stroke={K} strokeWidth="7" strokeLinecap="round" />
-        <rect x="246" y="59" width="33" height="10" rx="4" fill={gold} stroke={K} strokeWidth="3"
-          transform="rotate(-42 253 67)" />
-        <line x1="248" y1="70" x2="277" y2="48" stroke={K} strokeWidth="3.5" strokeLinecap="round" />
-        <line x1="192" y1="120" x2="192" y2="134" stroke={K} strokeWidth="22" strokeLinecap="round" />
-      </motion.g>
-      {/* Character with idle bob */}
-      <motion.g animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
-        <circle cx="150" cy="68" r="34" fill={skin} stroke={K} strokeWidth="3.5" />
-        <path d="M116 68 C116 32 184 32 184 68 C180 50 170 40 160 37 C153 34 147 34 140 37 C128 42 118 54 116 68Z" fill={K} />
-        <circle cx="139" cy="64" r="4.5" fill={K} />
-        <circle cx="161" cy="64" r="4.5" fill={K} />
-        <path d="M137 81 Q150 93 163 81" stroke={K} strokeWidth="3" fill="none" strokeLinecap="round" />
-        <rect x="143" y="102" width="14" height="18" fill={skin} />
-        <path d="M108 120 Q112 110 130 110 L170 110 Q188 110 192 120 L192 210 L108 210Z" fill={gold} stroke={K} strokeWidth="3.5" />
-        <rect x="141" y="112" width="18" height="9" rx="2" fill={dGold} stroke={K} strokeWidth="2" />
-        <rect x="108" y="207" width="84" height="13" rx="3" fill={dGold} stroke={K} strokeWidth="2.5" />
-        <line x1="108" y1="134" x2="72" y2="196" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <line x1="192" y1="134" x2="206" y2="116" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <rect x="108" y="220" width="34" height="90" rx="6" fill={K} />
-        <rect x="158" y="220" width="34" height="90" rx="6" fill={K} />
-        <ellipse cx="121" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-        <ellipse cx="173" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-      </motion.g>
-    </svg>
-  );
+  return <CharacterImage src="/workers/window-v3.png" alt="Doorway Detail window cleaning crew member" />;
 }
 
 function WorkerPressureWasher() {
-  return (
-    <svg viewBox="0 0 300 360" aria-hidden="true" className="h-full w-full">
-      <rect x="10" y="308" width="280" height="38" rx="4" fill="#E5E4E0" stroke={K} strokeWidth="2.5" />
-      {/* Water spray */}
-      <motion.g
-        animate={{ opacity: [0.5, 1, 0.5], x: [-3, 3, -3] }}
-        transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <path d="M207 252 C228 272 248 287 252 308" stroke="#5EADC9" strokeWidth="5" strokeLinecap="round" fill="none" strokeDasharray="8 6" />
-        <path d="M207 252 C234 264 256 274 264 296" stroke="#5EADC9" strokeWidth="4" strokeLinecap="round" fill="none" strokeDasharray="6 8" />
-        <path d="M207 252 C220 276 226 295 228 312" stroke="#5EADC9" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="5 9" opacity="0.7" />
-        {[0, 1, 2].map((i) => (
-          <motion.circle key={i} cx={237 + i * 12} cy={296 + i * 5} r={5}
-            fill="#5EADC9" opacity="0.7"
-            animate={{ opacity: [0, 0.9, 0], scale: [0.4, 1.6, 0.4] }}
-            transition={{ duration: 1, repeat: Infinity, delay: i * 0.25 }}
-          />
-        ))}
-      </motion.g>
-      {/* Wand */}
-      <motion.g
-        animate={{ rotate: [-7, 7, -7] }}
-        style={{ transformOrigin: "180px 190px" }}
-        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <line x1="180" y1="190" x2="210" y2="252" stroke={K} strokeWidth="8" strokeLinecap="round" />
-        <line x1="200" y1="228" x2="222" y2="220" stroke={K} strokeWidth="12" strokeLinecap="round" />
-        <circle cx="210" cy="254" r="8" fill={gold} stroke={K} strokeWidth="3" />
-        <line x1="210" y1="256" x2="210" y2="267" stroke={K} strokeWidth="5" />
-      </motion.g>
-      <motion.g animate={{ y: [0, -4, 0] }} transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}>
-        <circle cx="150" cy="68" r="34" fill={skin} stroke={K} strokeWidth="3.5" />
-        <path d="M116 65 C116 32 184 32 184 65Z" fill={K} />
-        <rect x="108" y="59" width="84" height="12" rx="5" fill={K} />
-        <circle cx="139" cy="64" r="4.5" fill={K} />
-        <circle cx="161" cy="64" r="4.5" fill={K} />
-        <path d="M137 81 Q150 93 163 81" stroke={K} strokeWidth="3" fill="none" strokeLinecap="round" />
-        <rect x="143" y="102" width="14" height="18" fill={skin} />
-        <path d="M108 120 Q112 110 130 110 L170 110 Q188 110 192 120 L192 210 L108 210Z" fill={gold} stroke={K} strokeWidth="3.5" />
-        <rect x="141" y="112" width="18" height="9" rx="2" fill={dGold} stroke={K} strokeWidth="2" />
-        <rect x="108" y="207" width="84" height="13" rx="3" fill={dGold} stroke={K} strokeWidth="2.5" />
-        <line x1="108" y1="134" x2="74" y2="196" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <line x1="192" y1="134" x2="214" y2="180" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <rect x="108" y="220" width="34" height="90" rx="6" fill={K} />
-        <rect x="158" y="220" width="34" height="90" rx="6" fill={K} />
-        <ellipse cx="121" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-        <ellipse cx="173" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-      </motion.g>
-    </svg>
-  );
+  return <CharacterImage src="/workers/pressure-v3.png" alt="Doorway Detail pressure washing crew member" />;
 }
 
 function WorkerLandscaper() {
-  return (
-    <svg viewBox="0 0 300 360" aria-hidden="true" className="h-full w-full">
-      <rect x="10" y="308" width="280" height="38" rx="4" fill="#C8D8A0" stroke={K} strokeWidth="2.5" />
-      <path d="M36 310 C38 294 45 284 47 279 C49 284 52 295 51 310" fill="#7A9E52" stroke={K} strokeWidth="2" />
-      <path d="M54 310 C55 298 60 290 63 286 C65 290 67 300 66 310" fill="#6A8C44" stroke={K} strokeWidth="2" />
-      <path d="M218 310 C220 296 226 287 229 283 C231 287 234 297 233 310" fill="#7A9E52" stroke={K} strokeWidth="2" />
-      <path d="M236 310 C237 300 241 292 244 288 C246 292 248 302 246 310" fill="#8AAE5C" stroke={K} strokeWidth="1.5" />
-      {/* Rake animated */}
-      <motion.g
-        animate={{ rotate: [-12, 12, -12] }}
-        style={{ transformOrigin: "196px 148px" }}
-        transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <line x1="196" y1="148" x2="256" y2="306" stroke={K} strokeWidth="7" strokeLinecap="round" />
-        <rect x="238" y="298" width="40" height="12" rx="3" fill={gold} stroke={K} strokeWidth="3"
-          transform="rotate(-20 256 304)" />
-        {[0, 1, 2, 3, 4].map((i) => (
-          <line key={i} x1={242 + i * 8} y1={305} x2={240 + i * 8} y2={320}
-            stroke={K} strokeWidth="2.5" strokeLinecap="round"
-            transform="rotate(-20 256 304)" />
-        ))}
-      </motion.g>
-      <motion.g animate={{ y: [0, -4, 0] }} transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}>
-        <circle cx="150" cy="68" r="34" fill={skin} stroke={K} strokeWidth="3.5" />
-        <path d="M116 68 C116 32 184 32 184 68 C180 52 172 42 164 38 C158 35 150 34 143 37 C130 42 118 55 116 68Z" fill={K} />
-        <path d="M184 58 C196 72 193 95 181 108" stroke={K} strokeWidth="9" strokeLinecap="round" fill="none" />
-        <circle cx="139" cy="64" r="4.5" fill={K} />
-        <circle cx="161" cy="64" r="4.5" fill={K} />
-        <path d="M137 81 Q150 93 163 81" stroke={K} strokeWidth="3" fill="none" strokeLinecap="round" />
-        <rect x="143" y="102" width="14" height="18" fill={skin} />
-        <path d="M108 120 Q112 110 130 110 L170 110 Q188 110 192 120 L192 210 L108 210Z" fill={gold} stroke={K} strokeWidth="3.5" />
-        <rect x="141" y="112" width="18" height="9" rx="2" fill={dGold} stroke={K} strokeWidth="2" />
-        <rect x="108" y="207" width="84" height="13" rx="3" fill={dGold} stroke={K} strokeWidth="2.5" />
-        <line x1="108" y1="134" x2="72" y2="196" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <line x1="192" y1="134" x2="216" y2="162" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <rect x="108" y="220" width="34" height="90" rx="6" fill={K} />
-        <rect x="158" y="220" width="34" height="90" rx="6" fill={K} />
-        <ellipse cx="121" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-        <ellipse cx="173" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-      </motion.g>
-    </svg>
-  );
+  return <CharacterImage src="/workers/landscaping-v3.png" alt="Doorway Detail landscaping crew member" />;
 }
 
 function WorkerGutterCleaner() {
-  return (
-    <svg viewBox="0 0 300 360" aria-hidden="true" className="h-full w-full">
-      {/* Gutter at top of frame */}
-      <path d="M20 36 L150 8 L280 36" fill="none" stroke={K} strokeWidth="4.5" strokeLinejoin="round" />
-      <rect x="20" y="34" width="260" height="18" rx="4" fill="#D0CFCC" stroke={K} strokeWidth="3.5" />
-      {[0, 1, 2, 3].map((i) => (
-        <ellipse key={i} cx={52 + i * 54} cy="43" rx="12" ry="6" fill="#7A9E52" opacity="0.9" />
-      ))}
-      {/* Falling debris */}
-      {[0, 1, 2].map((i) => (
-        <motion.circle key={i} cx={112 + i * 30} cy={58} r={5} fill="#7A9E52"
-          animate={{ y: [0, 50, 0], opacity: [0, 1, 0] }}
-          transition={{ duration: 1.7, repeat: Infinity, delay: i * 0.5, ease: "easeIn" }}
-        />
-      ))}
-      {/* Long pole to gutter */}
-      <motion.g
-        animate={{ rotate: [-4, 4, -4] }}
-        style={{ transformOrigin: "192px 134px" }}
-        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <line x1="192" y1="134" x2="162" y2="52" stroke={K} strokeWidth="7" strokeLinecap="round" />
-        <rect x="148" y="38" width="36" height="20" rx="4" fill={gold} stroke={K} strokeWidth="3.5"
-          transform="rotate(-8 166 48)" />
-        {[0, 1, 2, 3, 4].map((i) => (
-          <line key={i} x1={151 + i * 7} y1={52} x2={150 + i * 7} y2={65}
-            stroke={K} strokeWidth="2.5" strokeLinecap="round"
-            transform="rotate(-8 166 48)" />
-        ))}
-      </motion.g>
-      <motion.g animate={{ y: [0, -5, 0] }} transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut" }}>
-        <circle cx="150" cy="68" r="34" fill={skin} stroke={K} strokeWidth="3.5" />
-        <path d="M116 65 C116 32 184 32 184 65Z" fill={K} />
-        <rect x="108" y="59" width="84" height="12" rx="5" fill={K} />
-        <circle cx="139" cy="64" r="4.5" fill={K} />
-        <circle cx="161" cy="64" r="4.5" fill={K} />
-        <path d="M137 81 Q150 93 163 81" stroke={K} strokeWidth="3" fill="none" strokeLinecap="round" />
-        <rect x="143" y="102" width="14" height="18" fill={skin} />
-        <path d="M108 120 Q112 110 130 110 L170 110 Q188 110 192 120 L192 210 L108 210Z" fill={gold} stroke={K} strokeWidth="3.5" />
-        <rect x="141" y="112" width="18" height="9" rx="2" fill={dGold} stroke={K} strokeWidth="2" />
-        <rect x="108" y="207" width="84" height="13" rx="3" fill={dGold} stroke={K} strokeWidth="2.5" />
-        <line x1="108" y1="134" x2="72" y2="196" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <line x1="192" y1="134" x2="205" y2="114" stroke={K} strokeWidth="22" strokeLinecap="round" />
-        <rect x="108" y="220" width="34" height="90" rx="6" fill={K} />
-        <rect x="158" y="220" width="34" height="90" rx="6" fill={K} />
-        <ellipse cx="121" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-        <ellipse cx="173" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-      </motion.g>
-    </svg>
-  );
+  return <CharacterImage src="/workers/gutter-v3.png" alt="Doorway Detail gutter cleaning crew member" />;
 }
 
-// Two workers side by side — used for hero + Full Exterior tab
+// Team composition for hero + Full Exterior tab — single composite illustration.
 export function WorkerTeamFull() {
-  const sc = 0.72;
-  // Worker base at original scale, translated and scaled via transform
   return (
-    <svg viewBox="0 0 420 360" aria-hidden="true" className="h-full w-full">
-      {/* Left worker — curly hair, squeegee */}
-      <motion.g animate={{ y: [0, -6, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
-        <g transform={`translate(22, 18) scale(${sc})`}>
-          <circle cx="150" cy="68" r="34" fill={skin} stroke={K} strokeWidth="3.5" />
-          <path d="M116 68 C116 32 184 32 184 68 C180 50 170 40 160 37 C153 34 147 34 140 37 C128 42 118 54 116 68Z" fill={K} />
-          <circle cx="139" cy="64" r="4.5" fill={K} />
-          <circle cx="161" cy="64" r="4.5" fill={K} />
-          <path d="M137 81 Q150 93 163 81" stroke={K} strokeWidth="3" fill="none" strokeLinecap="round" />
-          <rect x="143" y="102" width="14" height="18" fill={skin} />
-          <path d="M108 120 Q112 110 130 110 L170 110 Q188 110 192 120 L192 210 L108 210Z" fill={gold} stroke={K} strokeWidth="3.5" />
-          <rect x="141" y="112" width="18" height="9" rx="2" fill={dGold} stroke={K} strokeWidth="2" />
-          <rect x="108" y="207" width="84" height="13" rx="3" fill={dGold} stroke={K} strokeWidth="2.5" />
-          <line x1="108" y1="134" x2="72" y2="196" stroke={K} strokeWidth="22" strokeLinecap="round" />
-          <line x1="192" y1="134" x2="214" y2="106" stroke={K} strokeWidth="22" strokeLinecap="round" />
-          <line x1="214" y1="106" x2="252" y2="68" stroke={K} strokeWidth="6" strokeLinecap="round" />
-          <rect x="244" y="55" width="30" height="10" rx="3" fill={gold} stroke={K} strokeWidth="3"
-            transform="rotate(-42 252 63)" />
-          <rect x="108" y="220" width="34" height="90" rx="6" fill={K} />
-          <rect x="158" y="220" width="34" height="90" rx="6" fill={K} />
-          <ellipse cx="121" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-          <ellipse cx="173" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-        </g>
-      </motion.g>
-
-      {/* Right worker — cap, broom */}
-      <motion.g animate={{ y: [0, -6, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.75 }}>
-        <g transform={`translate(204, 18) scale(${sc})`}>
-          <circle cx="150" cy="68" r="34" fill={skin} stroke={K} strokeWidth="3.5" />
-          <path d="M116 65 C116 32 184 32 184 65Z" fill={K} />
-          <rect x="108" y="59" width="84" height="12" rx="5" fill={K} />
-          <circle cx="139" cy="64" r="4.5" fill={K} />
-          <circle cx="161" cy="64" r="4.5" fill={K} />
-          <path d="M137 81 Q150 93 163 81" stroke={K} strokeWidth="3" fill="none" strokeLinecap="round" />
-          <rect x="143" y="102" width="14" height="18" fill={skin} />
-          <path d="M108 120 Q112 110 130 110 L170 110 Q188 110 192 120 L192 210 L108 210Z" fill={gold} stroke={K} strokeWidth="3.5" />
-          <rect x="141" y="112" width="18" height="9" rx="2" fill={dGold} stroke={K} strokeWidth="2" />
-          <rect x="108" y="207" width="84" height="13" rx="3" fill={dGold} stroke={K} strokeWidth="2.5" />
-          <line x1="108" y1="134" x2="72" y2="196" stroke={K} strokeWidth="22" strokeLinecap="round" />
-          <line x1="192" y1="134" x2="210" y2="170" stroke={K} strokeWidth="22" strokeLinecap="round" />
-          <line x1="210" y1="170" x2="234" y2="302" stroke={K} strokeWidth="7" strokeLinecap="round" />
-          <rect x="218" y="295" width="34" height="11" rx="3" fill={gold} stroke={K} strokeWidth="3"
-            transform="rotate(-18 234 300)" />
-          <rect x="108" y="220" width="34" height="90" rx="6" fill={K} />
-          <rect x="158" y="220" width="34" height="90" rx="6" fill={K} />
-          <ellipse cx="121" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-          <ellipse cx="173" cy="313" rx="27" ry="11" fill={gold} stroke={K} strokeWidth="3" />
-        </g>
-      </motion.g>
-    </svg>
+    <motion.div
+      animate={{ y: [0, -8, 0] }}
+      transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+      className="flex h-full w-full items-center justify-center"
+    >
+      <Image
+        src="/workers/team-v4.png"
+        alt="Doorway Detail crew — gutter, window, and landscaping"
+        width={1172}
+        height={634}
+        priority
+        className="h-auto max-h-full w-full max-w-full object-contain"
+      />
+    </motion.div>
   );
 }
 
@@ -430,9 +249,9 @@ const SERVICES: ServiceEntry[] = [
     title: "Window Cleaning",
     summary: "Crystal-clear glass, streak-free results on every pane.",
     bullets: [
-      "Exterior and interior windows",
+      "Exterior windows — every floor",
       "Screens, tracks, and frames",
-      "Water-fed pole systems for upper floors",
+      "Water-fed pole systems — safer than ladders",
     ],
     Character: WorkerWindowCleaner,
   },
@@ -452,7 +271,7 @@ const SERVICES: ServiceEntry[] = [
     bullets: [
       "Weed removal and edge cleanup",
       "Garden beds and seasonal tidy",
-      "Light property tidy — not full landscaping work",
+      "Full landscaping and seasonal property work",
     ],
     Character: WorkerLandscaper,
   },
@@ -462,7 +281,7 @@ const SERVICES: ServiceEntry[] = [
     bullets: [
       "Full debris removal and gutter flush",
       "Downspout clearing and inspection",
-      "Soffit and fascia detail on request",
+      "Soffit and fascia detailing on request",
     ],
     Character: WorkerGutterCleaner,
   },
@@ -497,20 +316,31 @@ export function ServicesSection() {
         <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
           {/* Tab list */}
           <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:pb-0">
-            {SERVICES.map((s, i) => (
-              <button
-                key={s.title}
-                onClick={() => setActive(i)}
-                className={`shrink-0 rounded-xl px-5 py-4 text-left text-sm font-bold transition lg:w-full ${
-                  active === i
-                    ? "text-black shadow-md"
-                    : "border border-black/10 bg-[#F5F4F0] text-black/60 hover:border-black/25 hover:text-black"
-                }`}
-                style={active === i ? { backgroundColor: gold } : {}}
-              >
-                {s.title}
-              </button>
-            ))}
+            {SERVICES.map((s, i) => {
+              const isPopular = s.title === "Full Exterior Package";
+              return (
+                <button
+                  key={s.title}
+                  onClick={() => setActive(i)}
+                  className={`relative shrink-0 rounded-xl px-5 py-4 text-left text-sm font-bold transition lg:w-full ${
+                    active === i
+                      ? "text-black shadow-md"
+                      : "border border-black/10 bg-[#F5F4F0] text-black/60 hover:border-black/25 hover:text-black"
+                  }`}
+                  style={active === i ? { backgroundColor: gold } : {}}
+                >
+                  {isPopular && (
+                    <span
+                      className="absolute -right-1 -top-2 rounded-full bg-black px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm"
+                      style={{ color: gold }}
+                    >
+                      Most Popular
+                    </span>
+                  )}
+                  {s.title}
+                </button>
+              );
+            })}
           </div>
 
           {/* Character + info panel */}
@@ -522,7 +352,7 @@ export function ServicesSection() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -28 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}
-                className="grid md:grid-cols-[1fr_1.1fr]"
+                className="grid md:grid-cols-[1.15fr_0.85fr]"
               >
                 <div className="flex flex-col justify-center p-7 lg:p-9">
                   <h3 className="text-3xl font-black text-black lg:text-4xl">{service.title}</h3>
@@ -543,7 +373,7 @@ export function ServicesSection() {
                     <ArrowRight size={16} />
                   </Link>
                 </div>
-                <div className="flex min-h-[300px] items-end justify-center bg-white px-6 pb-0 pt-6">
+                <div className="flex h-[380px] items-center justify-center overflow-hidden bg-white md:h-[460px]">
                   <service.Character />
                 </div>
               </motion.div>
@@ -606,14 +436,19 @@ export function JobLifecycleAnimation() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
-      className="rounded-xl border border-black/10 bg-[#F5F4F0] p-5"
+      className="rounded-2xl border border-black/10 bg-[#F5F4F0] p-6 lg:p-10"
     >
-      <div className="mb-6">
-        <p className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: dGold }}>
-          Your job, start to finish
-        </p>
-        <h3 className="mt-2 text-2xl font-black text-black">No payment upfront.</h3>
-      </div>
+      <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+        <div>
+          <div className="mb-6">
+            <p className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: dGold }}>
+              Your job, start to finish
+            </p>
+            <h3 className="mt-2 text-2xl font-black text-black lg:text-3xl">No payment upfront.</h3>
+            <p className="mt-3 max-w-md text-sm leading-6 text-black/60">
+              Free quote first. We invoice after the job is done — pay online, no cash, no chasing.
+            </p>
+          </div>
 
       {/* Mobile: vertical list */}
       <div className="flex flex-col gap-3 sm:hidden">
@@ -706,6 +541,121 @@ export function JobLifecycleAnimation() {
           })}
         </div>
       </div>
+        </div>
+
+        {/* Right column — reassurance / proof block */}
+        <div className="rounded-xl border border-black/10 bg-white p-5 lg:p-6">
+          <p className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: dGold }}>
+            Why this matters
+          </p>
+          <ul className="mt-4 space-y-3 text-sm font-semibold text-black/75">
+            {[
+              "Free quote — no obligation, no upsell",
+              "We don't get paid until the work is finished",
+              "Pay online from a digital invoice — no cash or e-transfer chasing",
+              "Insured, with proof of insurance on request",
+            ].map((line) => (
+              <li key={line} className="flex items-start gap-2">
+                <Check size={16} className="mt-0.5 shrink-0" style={{ color: gold }} />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </motion.div>
+  );
+}
+
+// ─── ANIMATED UPDATE-CARD ICONS ───────────────────────────────────────────────
+
+export function OnTheWayAnim() {
+  return (
+    <div className="relative inline-flex h-10 w-10 items-center justify-center">
+      <motion.span
+        className="absolute inset-0 rounded-full"
+        style={{ backgroundColor: `${gold}33` }}
+        animate={{ scale: [1, 1.7, 1], opacity: [0.6, 0, 0.6] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+      />
+      <motion.svg
+        viewBox="0 0 24 24"
+        width="26"
+        height="26"
+        animate={{ y: [0, -3, 0] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        className="relative"
+      >
+        <path
+          d="M12 2 C7.6 2 4 5.6 4 10 C4 16 12 22 12 22 C12 22 20 16 20 10 C20 5.6 16.4 2 12 2 Z"
+          fill={gold}
+          stroke={K}
+          strokeWidth="1.2"
+        />
+        <circle cx="12" cy="10" r="3" fill="#fff" />
+      </motion.svg>
+    </div>
+  );
+}
+
+export function JobDoneAnim() {
+  return (
+    <motion.div
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full"
+      style={{ backgroundColor: gold }}
+      initial={{ scale: 0.6, opacity: 0 }}
+      whileInView={{ scale: 1, opacity: 1 }}
+      viewport={{ once: true }}
+      transition={{ type: "spring", stiffness: 220, damping: 14, delay: 0.1 }}
+    >
+      <motion.svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <motion.path
+          d="M5 12.5 L10 17.5 L19 7"
+          fill="none"
+          stroke="#fff"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          initial={{ pathLength: 0 }}
+          whileInView={{ pathLength: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.55, delay: 0.35, ease: "easeOut" }}
+        />
+      </motion.svg>
+    </motion.div>
+  );
+}
+
+export function DigitalInvoiceAnim() {
+  return (
+    <div className="relative inline-flex h-10 w-10 items-center justify-center overflow-hidden">
+      <motion.svg
+        viewBox="0 0 24 24"
+        width="28"
+        height="28"
+        initial={{ y: 18, opacity: 0, rotate: -8 }}
+        whileInView={{ y: 0, opacity: 1, rotate: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.55, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <rect x="4" y="2.5" width="16" height="19" rx="2" fill="#fff" stroke={K} strokeWidth="1.5" />
+        <rect x="4" y="2.5" width="16" height="4" rx="2" fill={gold} />
+        <line x1="7" y1="11" x2="17" y2="11" stroke={dGold} strokeWidth="1.4" strokeLinecap="round" />
+        <line x1="7" y1="14" x2="15" y2="14" stroke={dGold} strokeWidth="1.4" strokeLinecap="round" />
+        <line x1="7" y1="17" x2="13" y2="17" stroke={dGold} strokeWidth="1.4" strokeLinecap="round" />
+        <motion.circle
+          cx="17.5"
+          cy="18"
+          r="3"
+          fill={gold}
+          stroke={K}
+          strokeWidth="1.2"
+          initial={{ scale: 0 }}
+          whileInView={{ scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.7, type: "spring", stiffness: 300, damping: 14 }}
+        />
+      </motion.svg>
+    </div>
   );
 }

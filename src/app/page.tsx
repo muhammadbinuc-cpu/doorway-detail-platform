@@ -5,16 +5,17 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   Check,
-  CheckCircle2,
-  CreditCard,
   Mail,
-  MapPin,
   Phone,
+  ShieldCheck,
   Zap,
 } from "lucide-react";
 import {
+  DigitalInvoiceAnim,
   FaqAccordion,
+  JobDoneAnim,
   JobLifecycleAnimation,
+  OnTheWayAnim,
   ServicesSection,
   WorkerTeamFull,
   equipmentChips,
@@ -29,19 +30,19 @@ const dGold = "#6B5010";
 
 const updateCards = [
   {
-    icon: MapPin,
+    Anim: OnTheWayAnim,
     title: "On the way",
-    text: "We text when the crew is on the way — no surprise arrivals or guessing on timing.",
+    text: "Text when the crew is heading over.",
   },
   {
-    icon: CheckCircle2,
+    Anim: JobDoneAnim,
     title: "Job done",
-    text: "You get a message when the work is done so you can check it before we leave the area.",
+    text: "Message when the work is finished, before we leave.",
   },
   {
-    icon: CreditCard,
+    Anim: DigitalInvoiceAnim,
     title: "Digital invoice",
-    text: "Invoice arrives the same day. Review and pay online — no cash, no chasing.",
+    text: "Same-day invoice. Pay online — no cash, no chasing.",
   },
 ];
 
@@ -85,6 +86,10 @@ export default function LandingPage() {
           </nav>
           <div className="hidden items-center gap-3 md:flex">
             <a href="tel:289-772-5757" className="inline-flex items-center gap-2 text-sm font-bold text-black/65 transition hover:text-black">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ backgroundColor: gold }} />
+                <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: gold }} />
+              </span>
               <Phone size={16} />
               289-772-5757
             </a>
@@ -105,15 +110,14 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
             <p className="mb-5 text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
-              Exterior home detailing across the GTA
+              Serving the GTA &amp; KW area
             </p>
-            <h1 className="max-w-3xl text-4xl font-black leading-[1.05] text-black sm:text-6xl lg:text-7xl">
-              Spotless Exteriors,<br />Done the Right Way.
+            <h1 className="max-w-3xl text-balance text-5xl font-black leading-[1.05] text-black sm:text-6xl lg:text-7xl">
+              Premium exterior care. Zero headaches.
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-black/65 sm:text-xl sm:leading-8">
-              We&apos;re not a general handyman service. We specialize in exterior cleaning — water-fed
-              pole systems for windows, commercial-grade pressure washers, and proper gutter equipment.
-              Every crew is matched to the job.
+            <p className="mt-6 max-w-xl text-base leading-7 text-black/65 sm:text-lg sm:leading-8">
+              Stop chasing unreliable contractors. Get specialized crews for your windows, gutters, and
+              landscaping who show up on time, communicate clearly, and never ask for upfront payment.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/quote"
@@ -141,7 +145,7 @@ export default function LandingPage() {
           </div>
 
           {/* Hero illustration */}
-          <div className="flex min-h-[360px] items-end justify-center overflow-hidden rounded-2xl border border-black/10 bg-[#F5F4F0] px-6 pb-0 pt-8">
+          <div className="flex h-[440px] items-end justify-center overflow-hidden rounded-2xl border border-black/10 bg-[#F5F4F0] px-4 pb-0 pt-8 sm:h-[480px] sm:px-6">
             <WorkerTeamFull />
           </div>
         </div>
@@ -153,12 +157,10 @@ export default function LandingPage() {
           <div className="space-y-4">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
-                Proper tools for every surface
+                Industrial equipment, every job.
               </p>
               <p className="mt-2 max-w-3xl text-base font-bold leading-7 text-black">
-                We don&apos;t show up with consumer gear. Water-fed pole systems for upper floors, commercial
-                hot-water pressure washers, soft-wash for delicate surfaces, and dedicated gutter flush tools —
-                the right equipment for every surface.
+                We don&apos;t show up with consumer gear.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -175,6 +177,26 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── SATISFACTION GUARANTEE BAR ── */}
+      <section className="px-5 py-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div
+            className="flex flex-col items-start gap-3 rounded-xl border-l-4 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:px-6"
+            style={{ borderColor: gold }}
+          >
+            <ShieldCheck size={26} style={{ color: dGold }} className="shrink-0" />
+            <div className="flex-1">
+              <p className="text-base font-black text-black">
+                100% satisfaction — we don&apos;t leave until you&apos;re happy.
+              </p>
+              <p className="text-sm text-black/60">
+                Missed a spot? We come back. No extra invoice.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── SERVICES (interactive tab section) ── */}
       <ServicesSection />
 
@@ -183,7 +205,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="mb-12 max-w-2xl">
             <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>How it works</p>
-            <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">From quote to clean — here&apos;s how it works.</h2>
+            <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">Quote to clean.</h2>
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {processSteps.map((step, index) => (
@@ -207,6 +229,52 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── BEFORE / AFTER (placeholder until photo set is delivered) ── */}
+      <section className="px-5 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+                Before &amp; after
+              </p>
+              <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
+                See the difference, side by side.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-black/65">
+                Real jobs. Same surface, before and after.
+              </p>
+            </div>
+            <a
+              href="tel:289-772-5757"
+              className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-black/15 bg-white px-5 py-3 text-sm font-black text-black transition hover:border-black lg:self-end"
+            >
+              <Phone size={16} />
+              Book yours: 289-772-5757
+            </a>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {["Driveway pressure wash", "Window restoration", "Gutter flush", "Full exterior reset"].map((label) => (
+              <div
+                key={label}
+                className="flex aspect-[16/10] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-black/15 bg-[#F5F4F0] p-6 text-center"
+              >
+                <div
+                  className="grid h-10 w-10 place-items-center rounded-full"
+                  style={{ backgroundColor: `${gold}22`, color: dGold }}
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                </div>
+                <p className="text-sm font-black text-black">{label}</p>
+                <p className="text-xs text-black/45">Photo coming soon</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── HOW WE KEEP YOU UPDATED ── */}
       <section className="px-5 py-20 lg:px-8 lg:py-24">
         <div className="mx-auto max-w-7xl">
@@ -218,8 +286,8 @@ export default function LandingPage() {
               You&apos;re never left wondering.
             </h2>
           </div>
-          <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="grid gap-5 sm:grid-cols-3 lg:grid-cols-1">
+          <div className="space-y-6">
+            <div className="grid gap-5 sm:grid-cols-3">
               {updateCards.map((card, i) => (
                 <motion.div
                   key={card.title}
@@ -229,7 +297,7 @@ export default function LandingPage() {
                   transition={{ duration: 0.5, delay: i * 0.08 }}
                   className="rounded-xl border border-black/10 bg-[#F5F4F0] p-6"
                 >
-                  <card.icon size={26} style={{ color: dGold }} />
+                  <card.Anim />
                   <h3 className="mt-4 text-xl font-black text-black">{card.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-black/65">{card.text}</p>
                 </motion.div>
@@ -246,11 +314,10 @@ export default function LandingPage() {
           <div>
             <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: gold }}>Why Doorway</p>
             <h2 className="mt-3 text-4xl font-black text-white sm:text-5xl">
-              One team for the outside jobs you keep putting off.
+              One team for the outside jobs.
             </h2>
             <p className="mt-5 text-base leading-7 text-white/60">
-              No bait-and-switch pricing, no vague quotes. We confirm the scope first, bring the proper
-              equipment, and follow up once it&apos;s done. That&apos;s the whole process.
+              Clear scope, proper equipment, follow-up after. That&apos;s it.
             </p>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
@@ -281,8 +348,7 @@ export default function LandingPage() {
                   Working on your street? Let us know.
                 </h2>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-black/65">
-                  If homes on your street or block want service around the same time, let us know when
-                  you quote. We can often route jobs together and reflect that in the pricing.
+                  Neighbours booking around the same time? Mention it in the quote — we route together and discount accordingly.
                 </p>
               </div>
               <Link
@@ -309,8 +375,7 @@ export default function LandingPage() {
                 Better every time you book.
               </h2>
               <p className="mt-5 text-base leading-7 text-black/65">
-                Repeat bookings cost less to plan and route — and we pass that on. Return clients also get
-                first access to open time slots before they&apos;re advertised. First in, always.
+                Repeat clients get priority time slots and faster quotes.
               </p>
               <Link
                 href="/quote"
@@ -344,8 +409,7 @@ export default function LandingPage() {
               Something else on the outside of your home?
             </h2>
             <p className="mt-5 max-w-3xl text-base leading-7 text-black/60">
-              If it&apos;s exterior and it fits the crew, send it through. We&apos;ll tell you straight —
-              what we can handle, what needs a specialist, and what&apos;s worth quoting.
+              If it&apos;s on the outside of your home, send it. We&apos;ll tell you straight what we can do.
             </p>
           </div>
           <Link
@@ -410,10 +474,10 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <BrandMark className="text-white" />
+              <BrandMark variant="dark" className="text-white" />
               <p className="mt-4 max-w-xl text-sm leading-6 text-white/50">
                 Professional exterior cleaning with a quote-first booking process. Windows, gutters,
-                pressure washing, and landscaping — across the GTA.
+                pressure washing, and landscaping — across the GTA and KW area.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
