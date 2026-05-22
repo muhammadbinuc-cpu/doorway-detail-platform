@@ -9,14 +9,12 @@
   @page { size: 4.25in 9.25in; margin: 0; }
 
   html, body {
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
     background: #d4d4d4;
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    color: #111111;
+    color: #111;
     -webkit-font-smoothing: antialiased;
   }
-
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
 
   @media screen {
@@ -31,7 +29,7 @@
   .side {
     width: 4.25in;
     height: 9.25in;
-    background: #ffffff;
+    background: #fff;
     position: relative;
     overflow: hidden;
     page-break-after: always;
@@ -40,292 +38,171 @@
   }
   .side:last-child { page-break-after: auto; }
 
-  /* Top zone reserved for door-knob hole punch */
-  .cutout-zone { height: 0.55in; flex-shrink: 0; }
+  /* ── Top punch clearance ── */
+  .cutout-zone { height: 1.2in; flex-shrink: 0; }
 
-  /* ─── Front-side logo header (large, centred) ─── */
-  .logo-header {
+  /* ─────────── SHARED HEADER (both sides identical) ─────────── */
+  .header {
     text-align: center;
     padding: 0 0.2in;
     flex-shrink: 0;
   }
-  .logo-header img { width: 2.1in; height: auto; display: inline-block; }
-  .logo-header .rule {
-    width: 1.6in;
+  .header img { width: 2.4in; height: auto; display: inline-block; }
+  .header .rule {
+    width: 2.6in;
     height: 0.012in;
     background: #C9A227;
-    margin: 0.1in auto 0;
+    margin: 0.18in auto 0;
     border-radius: 0.01in;
   }
 
-  /* ─── Headline ─── */
-  .headline {
-    text-align: center;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-weight: 900;
-    line-height: 1.04;
-    letter-spacing: -0.004in;
-    color: #111;
-    padding: 0 0.25in;
-    margin-top: 0.15in;
-  }
-  .headline.front { font-size: 0.3in; }
-  .headline .accent { color: #C9A227; }
-
-  /* ─── Team image (front hero) ─── */
-  .team-wrap {
-    margin-top: 0.05in;
-    padding: 0 0.18in;
+  /* ─────────── MIDDLE BODY (flex-grow so contact pins to bottom) ─────────── */
+  .body {
+    flex: 1;
     display: flex;
-    justify-content: center;
-  }
-  .team-wrap img { width: 100%; max-width: 3.6in; height: auto; display: block; }
-
-  /* ─── Offer block (front coupon) ─── */
-  .offer {
-    margin: 0.1in 0.25in 0;
-    background: #111;
-    color: #fff;
-    text-align: center;
-    border-radius: 0.1in;
-    padding: 0.13in 0.16in;
-    border: 0.025in dashed #C9A227;
-  }
-  .offer .eyebrow {
-    font-size: 0.1in;
-    font-weight: 800;
-    letter-spacing: 0.025in;
-    color: #C9A227;
-    text-transform: uppercase;
-  }
-  .offer .big {
-    font-size: 0.28in;
-    font-weight: 900;
-    margin-top: 0.04in;
-    line-height: 1.05;
-    letter-spacing: -0.003in;
-  }
-  .offer .big .gold { color: #C9A227; }
-  .offer .code-line {
-    font-size: 0.1in;
-    font-weight: 600;
-    margin-top: 0.06in;
-    letter-spacing: 0.02in;
-    color: rgba(255,255,255,0.7);
-    text-transform: uppercase;
-  }
-  .offer .code-line .code {
-    color: #C9A227;
-    font-weight: 800;
-    letter-spacing: 0.04in;
+    flex-direction: column;
+    padding: 0 0.32in;
   }
 
-  /* ─── Services horizontal row ─── */
-  .services-row {
-    text-align: center;
-    font-size: 0.115in;
-    font-weight: 700;
-    color: #111;
-    letter-spacing: 0.005in;
-    margin-top: 0.16in;
-    padding: 0 0.2in;
-    line-height: 1.5;
-  }
-  .services-row .dot {
-    display: inline-block;
-    width: 0.05in;
-    height: 0.05in;
-    background: #C9A227;
-    border-radius: 50%;
-    margin: 0 0.07in;
-    vertical-align: middle;
-  }
-
-  /* ─── Phone (large) ─── */
-  .phone-big {
-    margin-top: 0.16in;
-    text-align: center;
+  /* ─────────── SHARED CONTACT BLOCK (both sides identical) ─────────── */
+  .divider {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.08in;
-    font-size: 0.3in;
+    gap: 0.1in;
+    margin: 0.22in 0 0.16in;
+  }
+  .divider .line { width: 0.5in; height: 0.012in; background: #C9A227; border-radius: 0.01in; }
+  .divider .dot { width: 0.08in; height: 0.08in; background: #C9A227; border-radius: 50%; }
+
+  .contact { text-align: center; padding-bottom: 0.22in; }
+  .contact .phone {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.12in;
+    font-size: 0.32in;
     font-weight: 900;
     color: #111;
     letter-spacing: 0.008in;
     line-height: 1;
   }
+  .contact .phone-icon {
+    width: 0.34in;
+    height: 0.34in;
+    border-radius: 50%;
+    background: #C9A227;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .contact .web {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.07in;
+    margin-top: 0.12in;
+    font-size: 0.135in;
+    font-weight: 600;
+    color: #444;
+  }
 
-  /* ─── Footer band (both sides) ─── */
+  /* ─────────── FOOTER BAND ─────────── */
   .footer-band {
     background: #C9A227;
     color: #fff;
     text-align: center;
     font-size: 0.13in;
     font-weight: 800;
-    letter-spacing: 0.05in;
-    padding: 0.11in 0;
+    letter-spacing: 0.052in;
+    padding: 0.13in 0;
     flex-shrink: 0;
-    margin-top: auto;
   }
 
-  /* ─── Back compact header ─── */
-  .back-header {
+  /* ─────────── FRONT: vertical service list ─────────── */
+  .services {
+    margin: 0.32in auto 0;
+    width: max-content;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2in;
+    align-items: flex-start;
+  }
+  .services .item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 0.16in;
-    padding: 0 0.25in;
-    flex-shrink: 0;
+    font-size: 0.24in;
+    font-weight: 700;
+    color: #111;
+    letter-spacing: -0.003in;
   }
-  .back-header img { width: 1.15in; height: auto; flex-shrink: 0; }
-  .back-header .head-right {
-    text-align: right;
+  .services .spark {
+    color: #C9A227;
+    font-size: 0.24in;
+    line-height: 1;
+  }
+
+  /* ─────────── BACK: headline + promo + QR + scan button ─────────── */
+  .headline {
+    text-align: center;
     font-family: Georgia, 'Times New Roman', serif;
     font-weight: 900;
-    font-size: 0.21in;
+    font-size: 0.4in;
     line-height: 1.05;
-    letter-spacing: -0.003in;
     color: #111;
+    margin-top: 0.32in;
+    letter-spacing: -0.004in;
   }
-  .back-header .head-right .accent { color: #C9A227; }
-  .back-header-rule {
-    width: 3.7in;
-    height: 0.01in;
-    background: #C9A227;
-    margin: 0.12in auto 0;
-    border-radius: 0.01in;
-    flex-shrink: 0;
-  }
+  .headline .accent { color: #C9A227; }
 
-  /* ─── 3-step process ─── */
-  .steps-eyebrow {
+  .promo-line {
     text-align: center;
-    font-size: 0.1in;
-    font-weight: 800;
-    letter-spacing: 0.03in;
-    color: #6B5010;
-    text-transform: uppercase;
     margin-top: 0.18in;
+    font-size: 0.14in;
+    line-height: 1.5;
+    color: #555;
+    font-weight: 500;
   }
-  .steps {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 0.1in;
-    padding: 0.1in 0.22in 0;
-  }
-  .step {
-    text-align: center;
-  }
-  .step .num {
-    width: 0.34in;
-    height: 0.34in;
-    border-radius: 50%;
-    background: #C9A227;
-    color: #fff;
-    font-family: Georgia, serif;
-    font-weight: 900;
-    font-size: 0.2in;
-    line-height: 0.34in;
-    margin: 0 auto 0.06in;
-    text-align: center;
-  }
-  .step .label {
-    font-size: 0.1in;
+  .promo-line .code {
+    background: #111;
+    color: #C9A227;
     font-weight: 800;
+    padding: 0.03in 0.09in;
+    border-radius: 0.05in;
+    letter-spacing: 0.022in;
+    margin: 0 0.02in;
+  }
+  .promo-line .amount {
     color: #111;
-    line-height: 1.25;
-    text-transform: uppercase;
-    letter-spacing: 0.012in;
+    font-weight: 800;
   }
 
-  /* ─── QR card ─── */
   .qr-wrap {
-    margin: 0.18in auto 0;
-    width: 2.2in;
-    height: 2.2in;
-    padding: 0.08in;
+    margin: 0.28in auto 0;
+    width: 2.5in;
+    height: 2.5in;
+    padding: 0.1in;
     background: #fff;
-    border: 0.018in solid #C9A227;
-    border-radius: 0.06in;
-    flex-shrink: 0;
+    border: 0.02in solid #C9A227;
+    border-radius: 0.08in;
   }
   .qr-wrap svg { width: 100%; height: 100%; display: block; }
 
-  .scan-btn-wrap { text-align: center; margin-top: 0.1in; }
+  .scan-btn-wrap { text-align: center; margin-top: 0.2in; }
   .scan-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.08in;
+    gap: 0.1in;
     background: #C9A227;
     color: #111;
     font-weight: 900;
-    font-size: 0.14in;
-    letter-spacing: 0.022in;
-    padding: 0.08in 0.2in;
+    font-size: 0.17in;
+    letter-spacing: 0.026in;
+    padding: 0.12in 0.3in;
     border-radius: 999px;
-    box-shadow: 0 0.03in 0.08in rgba(201, 162, 39, 0.3);
+    box-shadow: 0 0.04in 0.1in rgba(201, 162, 39, 0.32);
   }
 
-  /* ─── Trust strip (back) ─── */
-  .trust-strip {
-    margin: 0.16in 0.18in 0;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.03in 0.1in;
-    font-size: 0.1in;
-    font-weight: 700;
-    color: #111;
-  }
-  .trust-strip .item {
-    display: flex;
-    align-items: center;
-    gap: 0.05in;
-  }
-  .trust-strip .check {
-    color: #C9A227;
-    font-weight: 900;
-    font-size: 0.12in;
-  }
-
-  /* ─── Same-street callout (back) ─── */
-  .same-street {
-    margin: 0.14in 0.25in 0;
-    text-align: center;
-    font-size: 0.1in;
-    font-style: italic;
-    color: #555;
-    line-height: 1.35;
-  }
-
-  /* ─── Compact contact (back) ─── */
-  .divider {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.08in;
-    margin: 0.14in 0 0.1in;
-  }
-  .divider .line { width: 0.4in; height: 0.01in; background: #C9A227; border-radius: 0.01in; }
-  .divider .dot { width: 0.06in; height: 0.06in; background: #C9A227; border-radius: 50%; }
-
-  .contact-line {
-    text-align: center;
-    font-size: 0.105in;
-    font-weight: 700;
-    color: #111;
-    letter-spacing: 0.005in;
-    padding: 0 0.18in;
-    line-height: 1.5;
-  }
-  .contact-line .sep {
-    color: #C9A227;
-    margin: 0 0.06in;
-    font-weight: 900;
-  }
-  .contact-line .muted { color: #555; font-weight: 600; }
-
-  /* ─── Inline icon helper ─── */
   .icon { display: inline-block; vertical-align: middle; }
 </style>
 </head>
@@ -335,35 +212,42 @@
 <div class="side">
   <div class="cutout-zone"></div>
 
-  <div class="logo-header">
+  <div class="header">
     <img src="../public/logo.png" alt="Doorway Detail">
     <div class="rule"></div>
   </div>
 
-  <div class="headline front">
-    Premium exterior care.<br>
-    <span class="accent">Zero headaches.</span>
-  </div>
+  <div class="body">
+    <div class="services">
+      <div class="item"><span class="spark">✦</span>Window Cleaning</div>
+      <div class="item"><span class="spark">✦</span>Pressure Washing</div>
+      <div class="item"><span class="spark">✦</span>Gutter Cleaning</div>
+      <div class="item"><span class="spark">✦</span>Landscaping</div>
+      <div class="item"><span class="spark">✦</span>Full Exterior Package</div>
+    </div>
 
-  <div class="team-wrap">
-    <img src="../public/workers/team-v4.png" alt="Doorway Detail crew">
-  </div>
+    <div style="flex:1"></div>
 
-  <div class="offer">
-    <div class="eyebrow">First-time customers</div>
-    <div class="big"><span class="gold">$25 OFF</span> YOUR FIRST CLEAN</div>
-    <div class="code-line">Use code <span class="code">DOOR25</span></div>
-  </div>
+    <div class="divider">
+      <span class="line"></span><span class="dot"></span><span class="line"></span>
+    </div>
 
-  <div class="services-row">
-    Windows<span class="dot"></span>Pressure Washing<span class="dot"></span>Gutters<span class="dot"></span>Landscaping
-  </div>
-
-  <div class="phone-big">
-    <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C9A227" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
-    </svg>
-    289-772-5757
+    <div class="contact">
+      <div class="phone">
+        <span class="phone-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </span>
+        289-772-5757
+      </div>
+      <div class="web">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A227" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        doorwaydetail.com
+      </div>
+    </div>
   </div>
 
   <div class="footer-band">DETAIL DONE FLAWLESSLY</div>
@@ -373,65 +257,60 @@
 <div class="side">
   <div class="cutout-zone"></div>
 
-  <div class="back-header">
+  <div class="header">
     <img src="../public/logo.png" alt="Doorway Detail">
-    <div class="head-right">
-      Free quote in<br><span class="accent">2 minutes.</span>
+    <div class="rule"></div>
+  </div>
+
+  <div class="body">
+    <div class="headline">
+      Book Your Quote<br><span class="accent">Today.</span>
     </div>
-  </div>
-  <div class="back-header-rule"></div>
 
-  <div class="steps-eyebrow">How it works</div>
-  <div class="steps">
-    <div class="step">
-      <div class="num">1</div>
-      <div class="label">Send service<br>+ address</div>
+    <div class="promo-line">
+      Use code <span class="code">DOOR25</span> for<br>
+      <span class="amount">$25 off</span> your first service.
     </div>
-    <div class="step">
-      <div class="num">2</div>
-      <div class="label">Quick call<br>or text back</div>
+
+    <div class="qr-wrap">
+      <!-- QR → https://doorwaydetail.com (error correction H) -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" shape-rendering="crispEdges"><path fill="#FFFFFF" d="M0 0h33v33H0z"/><path stroke="#111111" d="M0 0.5h7m3 0h1m4 0h2m6 0h2m1 0h7M0 1.5h1m5 0h1m3 0h2m2 0h4m2 0h1m2 0h1m2 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m3 0h1m2 0h1m4 0h2m3 0h1m2 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m2 0h2m1 0h1m2 0h1m1 0h1m1 0h1m2 0h3m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h6m1 0h3m2 0h2m1 0h2m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m3 0h3m1 0h1m1 0h4m1 0h1m1 0h1m2 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h1m1 0h3m5 0h2m2 0h1m1 0h1M2 8.5h2m2 0h6m1 0h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h2m1 0h1M3 9.5h1m1 0h1m5 0h2m4 0h1m1 0h1m1 0h1m1 0h1m1 0h2m2 0h2m1 0h1M0 10.5h2m4 0h1m2 0h2m4 0h1m1 0h1m5 0h2m1 0h1m2 0h1m1 0h2M0 11.5h3m2 0h1m2 0h4m1 0h1m5 0h2m2 0h1m1 0h5m1 0h1M0 12.5h2m2 0h4m1 0h4m2 0h4m2 0h1m3 0h1m5 0h1M1 13.5h1m1 0h2m2 0h6m1 0h2m2 0h2m1 0h2m1 0h2m3 0h1M2 14.5h2m2 0h4m1 0h1m1 0h1m7 0h1m2 0h1m1 0h4M0 15.5h1m6 0h1m2 0h3m2 0h1m1 0h2m1 0h3m1 0h1m2 0h1m2 0h2M1 16.5h1m4 0h2m1 0h1m2 0h6m1 0h3m1 0h2m1 0h1m1 0h1M1 17.5h2m2 0h1m1 0h2m2 0h1m2 0h3m1 0h1m1 0h1m1 0h2m1 0h4m1 0h2M1 18.5h1m2 0h1m1 0h2m1 0h2m1 0h1m1 0h5m2 0h2m2 0h2m3 0h3M0 19.5h3m1 0h2m3 0h3m1 0h4m2 0h2m7 0h1M0 20.5h1m1 0h3m1 0h1m1 0h3m1 0h2m2 0h1m2 0h1m1 0h1m2 0h1m1 0h2m1 0h2m1 0h1M0 21.5h1m3 0h2m3 0h1m1 0h3m4 0h1m1 0h1m3 0h1m4 0h1m1 0h2M2 22.5h1m1 0h1m1 0h1m1 0h2m1 0h1m2 0h3m5 0h3m1 0h3m1 0h3M1 23.5h1m2 0h2m2 0h3m1 0h2m1 0h2m1 0h1m1 0h1m4 0h1m1 0h1m1 0h1M0 24.5h1m1 0h5m1 0h1m1 0h1m1 0h1m2 0h1m4 0h2m2 0h5m2 0h1M8 25.5h1m1 0h2m5 0h2m2 0h1m1 0h2m3 0h2M0 26.5h7m1 0h4m2 0h1m4 0h3m1 0h2m1 0h1m1 0h2M0 27.5h1m5 0h1m2 0h2m1 0h2m9 0h2m3 0h5M0 28.5h1m1 0h3m1 0h1m3 0h2m1 0h1m3 0h2m1 0h1m1 0h10M0 29.5h1m1 0h3m1 0h1m1 0h3m1 0h2m2 0h7m1 0h1m2 0h1m1 0h2M0 30.5h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h2m1 0h1m3 0h3m1 0h2M0 31.5h1m5 0h1m2 0h1m1 0h3m2 0h4m3 0h4m3 0h1m1 0h1M0 32.5h7m2 0h1m3 0h1m1 0h3m1 0h2m1 0h2m2 0h3"/></svg>
     </div>
-    <div class="step">
-      <div class="num">3</div>
-      <div class="label">Crew shows<br>up prepared</div>
+
+    <div class="scan-btn-wrap">
+      <span class="scan-btn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+          <path d="M14 14h3v3M21 14v.01M14 21h7v-3M17 17v.01M21 17v.01M17 21v.01"/>
+        </svg>
+        SCAN TO BOOK
+      </span>
     </div>
-  </div>
 
-  <div class="qr-wrap">
-    <!-- QR → https://doorwaydetail.com  (error correction H) -->
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" shape-rendering="crispEdges"><path fill="#FFFFFF" d="M0 0h33v33H0z"/><path stroke="#111111" d="M0 0.5h7m3 0h1m4 0h2m6 0h2m1 0h7M0 1.5h1m5 0h1m3 0h2m2 0h4m2 0h1m2 0h1m2 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m3 0h1m2 0h1m4 0h2m3 0h1m2 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m2 0h2m1 0h1m2 0h1m1 0h1m1 0h1m2 0h3m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h6m1 0h3m2 0h2m1 0h2m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m3 0h3m1 0h1m1 0h4m1 0h1m1 0h1m2 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h1m1 0h3m5 0h2m2 0h1m1 0h1M2 8.5h2m2 0h6m1 0h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h2m1 0h1M3 9.5h1m1 0h1m5 0h2m4 0h1m1 0h1m1 0h1m1 0h1m1 0h2m2 0h2m1 0h1M0 10.5h2m4 0h1m2 0h2m4 0h1m1 0h1m5 0h2m1 0h1m2 0h1m1 0h2M0 11.5h3m2 0h1m2 0h4m1 0h1m5 0h2m2 0h1m1 0h5m1 0h1M0 12.5h2m2 0h4m1 0h4m2 0h4m2 0h1m3 0h1m5 0h1M1 13.5h1m1 0h2m2 0h6m1 0h2m2 0h2m1 0h2m1 0h2m3 0h1M2 14.5h2m2 0h4m1 0h1m1 0h1m7 0h1m2 0h1m1 0h4M0 15.5h1m6 0h1m2 0h3m2 0h1m1 0h2m1 0h3m1 0h1m2 0h1m2 0h2M1 16.5h1m4 0h2m1 0h1m2 0h6m1 0h3m1 0h2m1 0h1m1 0h1M1 17.5h2m2 0h1m1 0h2m2 0h1m2 0h3m1 0h1m1 0h1m1 0h2m1 0h4m1 0h2M1 18.5h1m2 0h1m1 0h2m1 0h2m1 0h1m1 0h5m2 0h2m2 0h2m3 0h3M0 19.5h3m1 0h2m3 0h3m1 0h4m2 0h2m7 0h1M0 20.5h1m1 0h3m1 0h1m1 0h3m1 0h2m2 0h1m2 0h1m1 0h1m2 0h1m1 0h2m1 0h2m1 0h1M0 21.5h1m3 0h2m3 0h1m1 0h3m4 0h1m1 0h1m3 0h1m4 0h1m1 0h2M2 22.5h1m1 0h1m1 0h1m1 0h2m1 0h1m2 0h3m5 0h3m1 0h3m1 0h3M1 23.5h1m2 0h2m2 0h3m1 0h2m1 0h2m1 0h1m1 0h1m4 0h1m1 0h1m1 0h1M0 24.5h1m1 0h5m1 0h1m1 0h1m1 0h1m2 0h1m4 0h2m2 0h5m2 0h1M8 25.5h1m1 0h2m5 0h2m2 0h1m1 0h2m3 0h2M0 26.5h7m1 0h4m2 0h1m4 0h3m1 0h2m1 0h1m1 0h2M0 27.5h1m5 0h1m2 0h2m1 0h2m9 0h2m3 0h5M0 28.5h1m1 0h3m1 0h1m3 0h2m1 0h1m3 0h2m1 0h1m1 0h10M0 29.5h1m1 0h3m1 0h1m1 0h3m1 0h2m2 0h7m1 0h1m2 0h1m1 0h2M0 30.5h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h2m1 0h1m3 0h3m1 0h2M0 31.5h1m5 0h1m2 0h1m1 0h3m2 0h4m3 0h4m3 0h1m1 0h1M0 32.5h7m2 0h1m3 0h1m1 0h3m1 0h2m1 0h2m2 0h3"/></svg>
-  </div>
+    <div style="flex:1"></div>
 
-  <div class="scan-btn-wrap">
-    <span class="scan-btn">
-      <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7"/>
-        <rect x="14" y="3" width="7" height="7"/>
-        <rect x="3" y="14" width="7" height="7"/>
-        <path d="M14 14h3v3M21 14v.01M14 21h7v-3M17 17v.01M21 17v.01M17 21v.01"/>
-      </svg>
-      SCAN TO BOOK
-    </span>
-  </div>
+    <div class="divider">
+      <span class="line"></span><span class="dot"></span><span class="line"></span>
+    </div>
 
-  <div class="trust-strip">
-    <div class="item"><span class="check">✓</span>100% satisfaction</div>
-    <div class="item"><span class="check">✓</span>Insured</div>
-    <div class="item"><span class="check">✓</span>Free estimates</div>
-    <div class="item"><span class="check">✓</span>No upfront payment</div>
-  </div>
-
-  <div class="same-street">
-    Working on your street? Mention it when you<br>quote — neighbour pricing available.
-  </div>
-
-  <div class="divider">
-    <span class="line"></span><span class="dot"></span><span class="line"></span>
-  </div>
-
-  <div class="contact-line">
-    289-772-5757<span class="sep">·</span>doorwaydetail.com<br>
-    <span class="muted">Serving the GTA + KW</span>
+    <div class="contact">
+      <div class="phone">
+        <span class="phone-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </span>
+        289-772-5757
+      </div>
+      <div class="web">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A227" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        doorwaydetail.com
+      </div>
+    </div>
   </div>
 
   <div class="footer-band">DETAIL DONE FLAWLESSLY</div>
