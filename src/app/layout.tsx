@@ -20,6 +20,14 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Doorway Detail | Exterior Home Detailing Across the GTA",
   description: "Window cleaning, pressure washing, gutter cleaning, landscaping, and full exterior packages across the GTA. Free estimates and easy online quotes.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", type: "image/svg+xml" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/icon.svg",
+  },
 };
 
 export const viewport: Viewport = {
