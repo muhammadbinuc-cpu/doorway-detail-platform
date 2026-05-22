@@ -163,38 +163,45 @@ export function FaqAccordion() {
 }
 
 // ─── CHARACTER COMPONENTS (PNG-based, brand-matched) ─────────────────────────
-// Source PNGs are trimmed + alpha-keyed crew illustrations.
-// Each is wrapped in motion.div for an idle vertical bob.
+// Each service panel uses a full-bleed crop so the illustration fills the frame.
 
 const bob = {
   animate: { y: [0, -8, 0] },
   transition: { duration: 3, repeat: Infinity, ease: "easeInOut" as const },
 };
 
-type CharSize = { w: number; h: number };
-const CHAR_SIZE: Record<string, CharSize> = {
-  "/workers/window-v3.png": { w: 856, h: 909 },
-  "/workers/pressure-v3.png": { w: 791, h: 720 },
-  "/workers/landscaping-v3.png": { w: 776, h: 735 },
-  "/workers/gutter-v3.png": { w: 791, h: 613 },
+// Per-image crop/zoom config: transform is applied to a wrapper so it
+// works independently of Next.js fill internals.
+const CHAR_CONFIG: Record<string, { contain?: boolean; wrapStyle?: React.CSSProperties }> = {
+  "/workers/landscaping-v3.png": {
+    contain: true,
+    wrapStyle: { transform: "scale(1.6) translateY(6%)", transformOrigin: "center top" },
+  },
+  "/workers/gutter-v3.png": {
+    contain: true,
+    wrapStyle: { transform: "scale(1.4) translateX(10%)", transformOrigin: "center center" },
+  },
 };
 
 function CharacterImage({ src, alt, priority = false }: { src: string; alt: string; priority?: boolean }) {
-  const size = CHAR_SIZE[src] ?? { w: 600, h: 800 };
+  const cfg = CHAR_CONFIG[src];
   return (
     <motion.div
       animate={bob.animate}
       transition={bob.transition}
-      className="flex h-full w-full items-center justify-center"
+      className="relative h-full w-full overflow-hidden"
     >
-      <Image
-        src={src}
-        alt={alt}
-        width={size.w}
-        height={size.h}
-        priority={priority}
-        className="h-full w-auto max-w-full object-contain"
-      />
+      {/* Inner wrapper handles per-image zoom/translate */}
+      <div className="absolute inset-0" style={cfg?.wrapStyle}>
+        <Image
+          src={src}
+          alt={alt}
+          priority={priority}
+          fill
+          sizes="(min-width: 768px) 40vw, 100vw"
+          className={cfg?.contain ? "object-contain" : "object-cover"}
+        />
+      </div>
     </motion.div>
   );
 }
@@ -373,7 +380,7 @@ export function ServicesSection() {
                     <ArrowRight size={16} />
                   </Link>
                 </div>
-                <div className="flex h-[380px] items-center justify-center overflow-hidden bg-white md:h-[460px]">
+                <div className="relative h-[380px] overflow-hidden bg-white md:h-[460px]">
                   <service.Character />
                 </div>
               </motion.div>
