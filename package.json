@@ -10,24 +10,19 @@
     "test": "jest"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
     "@react-email/components": "^1.0.6",
-    "@react-email/render": "^2.0.4",
-    "@stripe/stripe-js": "^8.6.1",
     "@supabase/supabase-js": "^2.89.0",
-    "clsx": "^2.1.1",
     "firebase": "^12.7.0",
-    "firebase-admin": "^13.6.0",
+    "firebase-admin": "13.10.0",
     "framer-motion": "^12.23.26",
-    "googleapis": "^169.0.0",
+    "googleapis": "172.0.0",
     "lucide-react": "^0.562.0",
-    "next": "16.1.1",
+    "next": "16.2.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.6.0",
-    "resend": "^6.6.0",
+    "resend": "6.12.3",
     "stripe": "^20.1.2",
-    "tailwind-merge": "^3.4.0",
     "twilio": "^5.11.1",
     "zod": "^4.3.4"
   },
@@ -35,14 +30,19 @@
     "@tailwindcss/postcss": "^4",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.1",
+    "eslint-config-next": "16.2.6",
     "jest": "^30.2.0",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "8.5.15"
   }
 }

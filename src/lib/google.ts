@@ -59,8 +59,9 @@ export async function addToGoogleCalendar(
 
         console.log("✅ Google Calendar Event Created:", response.data.htmlLink);
         return response.data;
-    } catch (error: any) {
-        console.error("❌ Google Calendar API Error:", error.message);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("❌ Google Calendar API Error:", message);
         // We catch the error so it doesn't crash the whole login flow
         return null;
     }

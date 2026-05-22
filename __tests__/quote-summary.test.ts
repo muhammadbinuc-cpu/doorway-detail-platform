@@ -34,4 +34,19 @@ describe("buildServiceSummary", () => {
     const result = buildServiceSummary([long], "x".repeat(500));
     expect(result.length).toBeLessThanOrEqual(200);
   });
+
+  test("appends meta string when provided (campaign attribution)", () => {
+    expect(buildServiceSummary(["Window Cleaning"], "", "promo: DOOR25 src: doorhanger"))
+      .toBe("Window Cleaning | promo: DOOR25 src: doorhanger");
+  });
+
+  test("services + notes + meta all combined", () => {
+    expect(buildServiceSummary(["Pressure Washing"], "Side gate access", "promo: DOOR25 src: doorhanger"))
+      .toBe("Pressure Washing | Notes: Side gate access | promo: DOOR25 src: doorhanger");
+  });
+
+  test("empty meta is ignored", () => {
+    expect(buildServiceSummary(["Window Cleaning"], "", "")).toBe("Window Cleaning");
+    expect(buildServiceSummary(["Window Cleaning"], "", "   ")).toBe("Window Cleaning");
+  });
 });

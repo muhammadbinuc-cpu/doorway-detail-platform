@@ -1,6 +1,6 @@
 // 🔒 src/app/api/auth/verify/route.ts
-// API route for session cookie verification (used by middleware)
-// Middleware can't use firebase-admin directly, so it calls this API
+// API route for session cookie verification (used by proxy)
+// Proxy can't use firebase-admin directly, so it calls this API
 
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase-admin';
@@ -30,9 +30,10 @@ export async function GET() {
             email: decodedClaims.email
         });
 
-    } catch (error: any) {
+    } catch (error) {
         // 🔒 Log the error internally, return generic 401
-        console.error('[Auth Verify] Session verification failed:', error.code || error.message);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('[Auth Verify] Session verification failed:', message);
 
         return NextResponse.json({ valid: false }, { status: 401 });
     }

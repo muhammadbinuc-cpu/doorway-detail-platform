@@ -8,11 +8,29 @@ import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, MapPin, Phone, Mail, Loader2, Trash2, Save, FileText } from "lucide-react";
 import { createJobFromClient, deleteClient, updateClientNotes } from "@/app/actions";
 
+interface ClientProfileData {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    propertyNotes?: string;
+}
+
+interface JobHistoryItem {
+    id: string;
+    service?: string;
+    status?: string;
+    createdAt?: {
+        seconds?: number;
+    };
+}
+
 export default function ClientProfile() {
     const params = useParams();
     const id = params?.id as string;
-    const [client, setClient] = useState<any>(null);
-    const [history, setHistory] = useState<any[]>([]);
+    const [client, setClient] = useState<ClientProfileData | null>(null);
+    const [history, setHistory] = useState<JobHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [creatingJob, setCreatingJob] = useState(false);
     const [notes, setNotes] = useState("");
@@ -25,13 +43,13 @@ export default function ClientProfile() {
             try {
                 const snap = await getDoc(doc(db, "clients", id));
                 if (snap.exists()) {
-                    const data = snap.data();
+                    const data = snap.data() as Omit<ClientProfileData, "id">;
                     setClient({ id: snap.id, ...data });
                     setNotes(data.propertyNotes || "");
                 }
                 const q = query(collection(db, "jobs"), where("clientId", "==", id), orderBy("createdAt", "desc"));
                 const jobs = await getDocs(q);
-                setHistory(jobs.docs.map(d => ({ id: d.id, ...d.data() })));
+                setHistory(jobs.docs.map(d => ({ id: d.id, ...d.data() } as JobHistoryItem)));
             } catch (error) { console.error(error); }
             finally { setLoading(false); }
         };
@@ -98,7 +116,7 @@ export default function ClientProfile() {
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 className="w-full h-32 bg-gray-50 rounded-xl p-4 font-medium outline-none border border-transparent focus:border-[#D4AF37] transition-all resize-none"
-                                placeholder="Enter gate codes, preferences, or dog names here..."
+                            placeholder="Enter gate codes, preferences, or property-specific instructions here..."
                             />
                         </div>
 
@@ -141,7 +159,7 @@ export default function ClientProfile() {
 
                         <div className="bg-blue-50 p-6 rounded-2xl text-blue-900 text-sm font-medium">
                             <p className="mb-2"><strong>💡 Pro Tip:</strong></p>
-                            Use the "Property Notes" to track gate codes or specific cleaning instructions to ensure consistent service.
+                            Use &quot;Property Notes&quot; to track gate codes or specific cleaning instructions to ensure consistent service.
                         </div>
                     </div>
                 </div>

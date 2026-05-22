@@ -82,7 +82,6 @@ src/
 │   │
 │   └── api/
 │       ├── auth/verify/route.ts  # Session cookie verification
-│       ├── quotes/route.ts       # Legacy API route (unused — real flow is submitQuote action)
 │       └── webhooks/stripe/      # Stripe payment webhook → marks job PAID
 │
 ├── components/
@@ -210,14 +209,12 @@ CANCELLED     → SCHEDULED  (reschedule)
 
 1. **Rate limiting resets on cold start** — in-memory. Fine for now; upgrade to Redis/Firestore for scale.
 2. **Geocoding defaults to mock** — `MOCK_GEOCODING=false` in env enables real Google Maps. Currently hardcodes Toronto coords.
-3. **`api/quotes/route.ts` is dead code** — uses client SDK with wrong field names (`customerName` vs `name`). Real flow is `submitQuote` server action. Don't use this route.
-4. **`services.ts` only has `logEvent`** — the rest was dead code and was removed. If Supabase isn't configured, logEvent silently no-ops.
-5. **Admin page is a single large component** — major refactor target. Extract JobCard, KPI strip, RevenueChart, ScheduleModal, InvoiceSettingsModal.
-6. **`alert()`/`confirm()` throughout admin** — replace with toast (sonner) when refactoring admin.
-7. **`public/` is empty** — no favicon, no OG image for social previews.
-8. **No real testimonials yet** — testimonials section intentionally removed. Add back when real Google reviews exist. Wire up Google Reviews embed or screenshot.
-9. **Before/after gallery missing** — high-conversion section, not built yet. Add when the team has real job photos. Placeholder slot exists in the plan.
-10. **Hover states in page.tsx use inline `onMouseEnter/Leave`** — because Tailwind 4 doesn't support arbitrary `hover:bg-[#hex]` with dynamic values. If refactoring, consider extracting button variants.
+3. **`services.ts` only has `logEvent`** — the rest was dead code and was removed. If Supabase isn't configured, logEvent silently no-ops.
+4. **Admin page is a single large component** — major refactor target. Extract JobCard, KPI strip, RevenueChart, ScheduleModal, InvoiceSettingsModal.
+5. **`alert()`/`confirm()` throughout admin** — replace with toast (sonner) when refactoring admin.
+6. **No real testimonials yet** — testimonials section intentionally removed. Add back when real Google reviews exist. Wire up Google Reviews embed or screenshot.
+7. **Before/after gallery missing** — high-conversion section, not built yet. Add when the team has real job photos. Placeholder slot exists in the plan.
+8. **Hover states in page.tsx use inline `onMouseEnter/Leave`** — because Tailwind 4 doesn't support arbitrary `hover:bg-[#hex]` with dynamic values. If refactoring, consider extracting button variants.
 
 ---
 

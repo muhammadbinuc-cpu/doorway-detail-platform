@@ -6,7 +6,6 @@ import {
   Section,
   Text,
   Button,
-  Hr,
   Head,
   Heading,
   Column,

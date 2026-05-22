@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import type { User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { Loader2, Search, Plus, MapPin, Phone, Mail, LayoutDashboard, Users, LogOut } from "lucide-react";
+import { Loader2, Search, Plus, Phone, Mail, LayoutDashboard, Users, LogOut } from "lucide-react";
 import Link from "next/link";
 // IMPORT ACTIONS
 import { createClient, createJobFromClient } from "@/app/actions";
@@ -18,13 +19,13 @@ interface Client {
     address: string;
     status: 'LEAD' | 'ACTIVE' | 'CHURNED';
     totalSpent: number;
-    lastServiceDate: any;
+    lastServiceDate?: unknown;
 }
 
 export default function ClientsPage() {
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const router = useRouter();

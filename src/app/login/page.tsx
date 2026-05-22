@@ -36,12 +36,14 @@ export default function LoginPage() {
             } else {
                 setError("❌ Server Verification Failed");
             }
-        } catch (e: any) {
+        } catch (e) {
             console.error("Login Failed:", e);
-            if (e.code === 'auth/invalid-credential') {
+            const code = e && typeof e === "object" && "code" in e ? String(e.code) : "";
+            const message = e instanceof Error ? e.message : "Unknown error";
+            if (code === 'auth/invalid-credential') {
                 setError("❌ Incorrect email or password");
             } else {
-                setError("❌ Login failed: " + e.message);
+                setError("❌ Login failed: " + message);
             }
         } finally {
             setLoading(false);

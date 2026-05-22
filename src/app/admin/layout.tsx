@@ -24,9 +24,10 @@ export default async function AdminLayout({
   // 🔒 Verify the session cookie with Firebase Admin
   try {
     await adminAuth.verifySessionCookie(sessionCookie.value, true /* checkRevoked */);
-  } catch (error: any) {
+  } catch (error) {
     // 🔒 Session invalid/expired - redirect to login
-    console.error('[AdminLayout] Session verification failed:', error.code);
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown';
+    console.error('[AdminLayout] Session verification failed:', code);
     redirect('/login');
   }
 

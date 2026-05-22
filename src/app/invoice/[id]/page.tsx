@@ -7,11 +7,22 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, CreditCard, ShieldCheck } from "lucide-react";
 import { createCheckoutSession } from "@/app/actions";
 
+interface InvoiceJob {
+    id: string;
+    name?: string;
+    address?: string;
+    service?: string;
+    status?: string;
+    price?: number;
+    discount?: number;
+    taxRate?: number;
+}
+
 export default function InvoicePage() {
     const params = useParams();
     const searchParams = useSearchParams();
     const id = params?.id as string;
-    const [job, setJob] = useState<any>(null);
+    const [job, setJob] = useState<InvoiceJob | null>(null);
     const [loading, setLoading] = useState(true);
     const [paying, setPaying] = useState(false);
 
@@ -21,7 +32,7 @@ export default function InvoicePage() {
         if (!id) return;
         const fetchJob = async () => {
             const snap = await getDoc(doc(db, "jobs", id));
-            if (snap.exists()) setJob({ id: snap.id, ...snap.data() });
+            if (snap.exists()) setJob({ id: snap.id, ...snap.data() } as InvoiceJob);
             setLoading(false);
         };
         fetchJob();

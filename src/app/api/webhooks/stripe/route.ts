@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import Stripe from "stripe";
+import { validateId } from "@/lib/validation";
 
 // --- STRIPE INIT (LAZY LOADING) ---
 let _stripe: Stripe | null = null;
@@ -29,17 +30,28 @@ export async function POST(req: Request) {
     try {
         if (!sig || !endpointSecret) throw new Error("Missing Signature or Secret");
         event = getStripe().webhooks.constructEvent(body, sig, endpointSecret);
-    } catch (err: any) {
-        console.error(`❌ Webhook Error: ${err.message}`);
-        return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`❌ Webhook Error: ${message}`);
+        return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
     }
 
     if (event.type === "checkout.session.completed") {
         const session = event.data.object as Stripe.Checkout.Session;
-        const jobId = session.metadata?.jobId;
+        const rawJobId = session.metadata?.jobId;
 
-        if (jobId) {
-            console.log(`💰 Payment Received for Job: ${jobId}`);
+        if (session.payment_status !== "paid") {
+            return NextResponse.json({ received: true });
+        }
+
+        if (rawJobId) {
+            let jobId: string;
+            try {
+                jobId = validateId(rawJobId);
+            } catch {
+                console.warn("⚠️ Payment received with invalid Job ID metadata.");
+                return NextResponse.json({ received: true });
+            }
 
             await adminDb.collection("jobs").doc(jobId).update({
                 status: "PAID",

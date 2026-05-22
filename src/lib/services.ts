@@ -11,7 +11,7 @@ const getSupabase = () => {
 };
 
 export const ServiceLayer = {
-    logEvent: async (action: string, meta: any) => {
+    logEvent: async (action: string, meta: Record<string, unknown>) => {
         const supabase = getSupabase();
         if (!supabase) return;
         try {
@@ -20,8 +20,9 @@ export const ServiceLayer = {
                 meta,
                 timestamp: new Date().toISOString()
             });
-        } catch (error: any) {
-            console.warn("⚠️ Logging Failed:", error.message);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn("⚠️ Logging Failed:", message);
         }
     }
 };

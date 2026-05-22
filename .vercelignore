@@ -1,0 +1,8 @@
+.playwright-mcp/
+print/
+
+# Local design/export artifacts kept at the repo root.
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp

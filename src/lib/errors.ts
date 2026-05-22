@@ -68,8 +68,9 @@ function extractErrorCode(error: unknown): string {
         return error.code;
     }
     if (error && typeof error === 'object') {
-        if ('code' in error && typeof (error as any).code === 'string') {
-            return (error as any).code;
+        const maybeCode = (error as { code?: unknown }).code;
+        if (typeof maybeCode === 'string') {
+            return maybeCode;
         }
         if ('name' in error) {
             const name = (error as Error).name;

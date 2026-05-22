@@ -26,7 +26,6 @@ if (!admin.apps.length) {
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount),
             });
-            console.log("✅ Firebase Admin Initialized");
         } catch (error) {
             console.error("❌ Firebase Init Failed (Check your Private Key format):", error);
         }

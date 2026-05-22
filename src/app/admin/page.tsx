@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import type { User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot, query, doc, orderBy, limit } from "firebase/firestore"; // ❌ Removed deleteDoc
+import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { Loader2, MapPin, Phone, LogOut, Trash2, FileText, TrendingUp, Users, LayoutDashboard, Settings, X, Truck, Repeat } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Link from "next/link";
@@ -18,8 +19,8 @@ interface Job {
     service: string;
     address: string;
     phone: string;
-    status: 'LEAD_RECEIVED' | 'SCHEDULED' | 'COMPLETED' | 'INVOICED' | 'PAID';
-    createdAt: any;
+    status: 'LEAD_RECEIVED' | 'SCHEDULED' | 'COMPLETED' | 'INVOICED' | 'PAID' | 'UNPAID' | 'LOST' | 'CANCELLED';
+    createdAt: unknown;
     price?: number;
     discount?: number;
     taxRate?: number;
@@ -34,8 +35,7 @@ const getNextStatuses = (currentStatus: string): string[] => {
 export default function AdminPage() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState<any>(null);
-    const [mounted, setMounted] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [editingJob, setEditingJob] = useState<Job | null>(null);
     const [editForm, setEditForm] = useState({ discount: 0, taxRate: 13, invoiceNotes: "" });
@@ -47,7 +47,6 @@ export default function AdminPage() {
     const router = useRouter();
 
     useEffect(() => {
-        setMounted(true);
         let unsubscribeSnapshot: (() => void) | null = null;
         const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
             if (u) {
@@ -98,7 +97,7 @@ export default function AdminPage() {
                         <div className="bg-[#D4AF37] text-black p-6 rounded-2xl shadow-sm"><h3 className="text-black/60 text-xs font-bold uppercase">Total Revenue</h3><p className="text-4xl font-black mt-2">${totalRevenue.toFixed(2)}</p></div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"><h3 className="text-gray-400 text-xs font-bold uppercase">Pipeline Value</h3><p className="text-4xl font-black mt-2 text-blue-600">${potentialRevenue.toFixed(2)}</p></div>
                     </div>
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-8 h-80"><h3 className="font-bold flex items-center gap-2 mb-4"><TrendingUp size={16} /> Revenue Overview</h3>{mounted ? (<ResponsiveContainer width="100%" height="100%"><BarChart data={chartData}><XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} /><Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} /><Bar dataKey="amount" radius={[4, 4, 0, 0]}>{chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={index === 2 ? '#D4AF37' : '#e5e7eb'} />))}</Bar></BarChart></ResponsiveContainer>) : <div className="h-full w-full bg-gray-50 animate-pulse rounded-xl"></div>}</div>
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-8 h-80"><h3 className="font-bold flex items-center gap-2 mb-4"><TrendingUp size={16} /> Revenue Overview</h3><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData}><XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} /><Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} /><Bar dataKey="amount" radius={[4, 4, 0, 0]}>{chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={index === 2 ? '#D4AF37' : '#e5e7eb'} />))}</Bar></BarChart></ResponsiveContainer></div>
                     <AnimatePresence mode="popLayout">
                         <div className="grid gap-6">
                             {jobs.map((job) => (

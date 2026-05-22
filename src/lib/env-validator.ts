@@ -154,8 +154,8 @@ export function requireValidEnv(): void {
 
     const result = validateEnv();
 
-    // 🔒 Log warnings for optional missing variables
-    if (result.warnings.length > 0) {
+    // 🔒 Log warnings for optional missing variables during local development only.
+    if (process.env.NODE_ENV === 'development' && result.warnings.length > 0) {
         console.warn('\n⚠️  Environment Variable Warnings:');
         result.warnings.forEach(w => console.warn(`   - ${w}`));
     }
@@ -181,11 +181,6 @@ export function requireValidEnv(): void {
         if (process.env.NODE_ENV !== 'production') {
             throw new Error(fullMessage);
         }
-    }
-
-    // ✅ Success message
-    if (result.valid) {
-        console.log('✅ All required environment variables validated');
     }
 }
 

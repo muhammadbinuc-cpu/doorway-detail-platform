@@ -2,7 +2,7 @@
 // Protects against spam, DoS attacks, and credential stuffing
 
 import { headers } from 'next/headers';
-import { createRateLimitError, AppError } from './errors';
+import { createRateLimitError } from './errors';
 
 interface RateLimitEntry {
     count: number;
@@ -29,13 +29,6 @@ function cleanupOldEntries(): void {
             rateLimitStore.delete(key);
         }
     }
-}
-
-interface RateLimitConfig {
-    maxRequests: number;      // Max requests per window
-    windowMs: number;         // Time window in milliseconds
-    blockDurationMs: number;  // How long to block after exceeding limit
-    identifier?: string;      // Custom identifier (default: IP + action)
 }
 
 // 🔒 Default configurations for different actions

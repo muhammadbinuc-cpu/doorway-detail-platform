@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BadgeCheck,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -32,6 +33,19 @@ export default function QuotePage() {
     phone: "",
     address: "",
   });
+
+  // Campaign attribution from query string (e.g. ?src=doorhanger&promo=DOOR25)
+  const [promo, setPromo] = useState<string>("");
+  const [src, setSrc] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const p = (params.get("promo") || "").toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 20);
+    const s = (params.get("src") || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 20);
+    if (p) setPromo(p);
+    if (s) setSrc(s);
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -68,9 +82,15 @@ export default function QuotePage() {
     }
     setLoading(true);
 
+    const metaParts = [
+      promo ? `promo: ${promo}` : "",
+      src ? `src: ${src}` : "",
+    ].filter(Boolean);
+    const meta = metaParts.join(" ");
+
     const quotePayload = {
       ...formData,
-      service: buildServiceSummary(selectedServices, notes),
+      service: buildServiceSummary(selectedServices, notes, meta),
     };
 
     try {
@@ -112,6 +132,17 @@ export default function QuotePage() {
           <QuoteIntro />
 
           <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm sm:p-8">
+            {promo && (
+              <div className="mb-6 flex items-center gap-3 rounded-lg border-2 border-[#C9A227] bg-[#C9A227]/10 px-4 py-3">
+                <BadgeCheck size={22} className="shrink-0" color="#6B5010" />
+                <div className="text-sm">
+                  <p className="font-black text-black">
+                    Promo <span className="rounded bg-black px-1.5 py-0.5 font-mono text-xs text-[#C9A227]">{promo}</span> applied
+                  </p>
+                  <p className="text-xs font-semibold text-black/65">$25 off your first service — confirmed at quote.</p>
+                </div>
+              </div>
+            )}
             <div className="mb-9 h-1.5 overflow-hidden rounded-full bg-black/10">
               <div
                 className="h-full bg-[#C9A227] transition-all duration-500 ease-out"

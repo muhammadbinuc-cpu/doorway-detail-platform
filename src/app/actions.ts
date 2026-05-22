@@ -32,6 +32,11 @@ import { sanitizeKey } from '@/lib/key-utils';
 const MOCK_GEOCODING = process.env.MOCK_GEOCODING !== 'false';
 const SESSION_COOKIE_NAME = '__session';
 const SESSION_COOKIE_EXPIRES_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
+const PAYABLE_STATUSES = new Set(["INVOICED", "UNPAID"]);
+
+function getErrorCode(error: unknown): string {
+    return error && typeof error === "object" && "code" in error ? String(error.code) : "unknown";
+}
 
 // --- STRIPE INIT ---
 let _stripe: Stripe | null = null;
@@ -73,8 +78,8 @@ async function requireAdmin() {
     if (!sessionCookie?.value) throw new AppError('unauthorized', 'No session cookie', 'Access denied.');
     try {
         await adminAuth.verifySessionCookie(sessionCookie.value, true);
-    } catch (error: any) {
-        throw new AppError('unauthorized', `Session invalid: ${error.code}`, 'Session expired.');
+    } catch (error) {
+        throw new AppError('unauthorized', `Session invalid: ${getErrorCode(error)}`, 'Session expired.');
     }
 }
 
@@ -359,20 +364,26 @@ export async function createRecurringJob(originalJobId: string) {
 
 export async function createCheckoutSession(jobId: string) {
     try {
-        validateId(jobId);
-        const job = (await adminDb.collection("jobs").doc(jobId).get()).data();
+        const validJobId = validateId(jobId);
+        const job = (await adminDb.collection("jobs").doc(validJobId).get()).data();
         if (!job) throw new AppError('not-found', `Job not found`, 'Invoice not found');
+        if (!PAYABLE_STATUSES.has(job.status)) {
+            throw new AppError('validation-error', `Job ${validJobId} is not payable from status ${job.status}`, 'This invoice is not available for payment.');
+        }
 
         const price = Number(job.price) || 0;
         const discount = Number(job.discount) || 0;
         const taxRate = Number(job.taxRate) || 0;
         const total = (price - discount) * (1 + (taxRate / 100));
         const amountInCents = Math.round(total * 100);
+        if (amountInCents <= 0) {
+            throw new AppError('validation-error', `Job ${validJobId} has non-positive invoice total`, 'This invoice cannot be paid online.');
+        }
 
         const session = await getStripe().checkout.sessions.create({
             payment_method_types: ['card'],
-            line_items: [{ price_data: { currency: 'cad', product_data: { name: `Service: ${job.service}`, description: `Invoice #${jobId.slice(0, 6).toUpperCase()}` }, unit_amount: amountInCents }, quantity: 1 }],
-            mode: 'payment', success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?success=true`, cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}?canceled=true`, metadata: { jobId },
+            line_items: [{ price_data: { currency: 'cad', product_data: { name: `Service: ${job.service}`, description: `Invoice #${validJobId.slice(0, 6).toUpperCase()}` }, unit_amount: amountInCents }, quantity: 1 }],
+            mode: 'payment', success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${validJobId}?success=true`, cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${validJobId}?canceled=true`, metadata: { jobId: validJobId },
         });
         return { success: true, url: session.url };
     } catch (error) {
