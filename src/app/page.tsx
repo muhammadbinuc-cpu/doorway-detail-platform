@@ -31,17 +31,17 @@ const updateCards = [
   {
     icon: MapPin,
     title: "On the way",
-    text: "We send clear arrival updates so you know when the crew is coming.",
+    text: "We text when the crew is on the way — no surprise arrivals or guessing on timing.",
   },
   {
     icon: CheckCircle2,
     title: "Job done",
-    text: "You get a completion message when the exterior work is wrapped up.",
+    text: "You get a message when the work is done so you can check it before we leave the area.",
   },
   {
     icon: CreditCard,
     title: "Digital invoice",
-    text: "Your invoice is easy to review and pay after the confirmed work is complete.",
+    text: "Invoice arrives the same day. Review and pay online — no cash, no chasing.",
   },
 ];
 
@@ -49,22 +49,22 @@ const returnPerks = [
   {
     value: "Smarter scheduling",
     title: "Return bookings",
-    text: "Once we know the property, repeat visits are easier to scope and schedule.",
+    text: "Once we know the property, repeat visits are faster to scope, quote, and schedule.",
   },
   {
-    value: "Clear history",
+    value: "Service on file",
     title: "First access",
-    text: "Your past service notes help us quote the next visit with less back-and-forth.",
+    text: "Property notes from your last visit mean the next quote takes minutes, not a walkthrough.",
   },
   {
     value: "Seasonal bundles",
-    title: "Spring & fall deals",
-    text: "Combine outside jobs into one practical quote when the timing makes sense.",
+    title: "Spring & fall resets",
+    text: "Combine outside jobs into one visit and one practical quote when the season calls for it.",
   },
   {
-    value: "Neighbour routes",
-    title: "Refer a neighbour",
-    text: "Nearby jobs can sometimes be routed together for better availability.",
+    value: "Neighbour routing",
+    title: "Same-street jobs",
+    text: "If a neighbour books around the same time, we can often route both jobs and price it efficiently.",
   },
 ];
 
@@ -150,7 +150,7 @@ export default function LandingPage() {
       {/* ── EQUIPMENT CREDIBILITY STRIP ── */}
       <section className="border-y border-black/8 bg-[#F5F4F0] px-5 py-10 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="space-y-4">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
                 Proper tools for every surface
@@ -158,7 +158,7 @@ export default function LandingPage() {
               <p className="mt-2 max-w-3xl text-base font-bold leading-7 text-black">
                 We don&apos;t show up with consumer gear. Water-fed pole systems for upper floors, commercial
                 hot-water pressure washers, soft-wash for delicate surfaces, and dedicated gutter flush tools —
-                the right equipment for the surface.
+                the right equipment for every surface.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

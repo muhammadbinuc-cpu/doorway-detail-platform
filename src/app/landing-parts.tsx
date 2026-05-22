@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BadgeCheck,
   CalendarCheck,
+  Check,
   CheckCircle2,
   ClipboardList,
   CreditCard,
@@ -26,9 +27,9 @@ const K = "#111111";
 
 export const trustChips = [
   "Free estimates",
-  "Professional equipment",
+  "Specialized crews",
   "Clear updates",
-  "Easy online quote",
+  "No upfront payment",
   "Insured",
   "GTA service area",
 ];
@@ -77,8 +78,8 @@ export const reassuranceItems = [
   },
   {
     icon: Tag,
-    title: "Return client value",
-    text: "Repeat properties are easier to plan, so we can recommend practical bundles and timing.",
+    title: "Better every visit",
+    text: "Return clients get priority scheduling, seasonal bundle recommendations, and a crew that already knows the property.",
   },
 ];
 
@@ -429,7 +430,7 @@ const SERVICES: ServiceEntry[] = [
     title: "Window Cleaning",
     summary: "Crystal-clear glass, streak-free results on every pane.",
     bullets: [
-      "Exterior + interior windows",
+      "Exterior and interior windows",
       "Screens, tracks, and frames",
       "Water-fed pole systems for upper floors",
     ],
@@ -451,7 +452,7 @@ const SERVICES: ServiceEntry[] = [
     bullets: [
       "Weed removal and edge cleanup",
       "Garden beds and seasonal tidy",
-      "Precise exterior detail, not heavy landscaping",
+      "Light property tidy — not full landscaping work",
     ],
     Character: WorkerLandscaper,
   },
@@ -636,7 +637,7 @@ export function JobLifecycleAnimation() {
                   }}
                 >
                   {isDone ? (
-                    <CheckCircle2 size={16} color={gold} />
+                    <Check size={16} color={gold} />
                   ) : (
                     <stage.Icon size={16} color={isActive ? "#fff" : "rgba(0,0,0,0.35)"} />
                   )}
