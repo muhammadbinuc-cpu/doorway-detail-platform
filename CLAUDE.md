@@ -65,8 +65,10 @@ src/
 │   ├── actions.ts               # ⭐ ALL server actions — every mutation lives here
 │   │
 │   ├── admin/
-│   │   ├── layout.tsx           # Server component — Firebase session auth guard
-│   │   ├── page.tsx             # Dashboard: job cards, KPIs, chart, modals (dense — refactor target)
+│   │   ├── layout.tsx           # Auth guard + <ConfirmProvider> (promise-based confirm dialog)
+│   │   ├── page.tsx             # Dashboard: job cards (friendly status labels), KPIs, chart, line-items editor modal
+│   │   ├── invoices/page.tsx    # Invoices list — overdue badges/KPI, Mark Paid (method), Resend, Remind
+│   │   ├── schedule/page.tsx    # Month calendar of scheduled jobs (plain date math, no dep)
 │   │   └── clients/
 │   │       ├── page.tsx         # Client list
 │   │       └── [id]/page.tsx    # Client detail + job history
@@ -85,8 +87,14 @@ src/
 │       └── webhooks/stripe/      # Stripe payment webhook → marks job PAID
 │
 ├── components/
+│   ├── admin/
+│   │   └── AdminSidebar.tsx          # ⭐ Shared admin nav (active prop) — used by all /admin pages
+│   ├── ui/
+│   │   └── ConfirmDialog.tsx         # ConfirmProvider + useConfirm() — promise-based confirm (replaces window.confirm)
 │   └── email/
-│       └── InvoiceEmail.tsx     # React Email template — accepts service, amount, clientName
+│       ├── InvoiceEmail.tsx          # React Email — full breakdown (line items, subtotal/discount/tax/total, HST)
+│       ├── InvoiceReminderEmail.tsx  # React Email — overdue payment reminder
+│       └── QuoteConfirmationEmail.tsx # React Email — instant "we got your request" to new leads
 │
 └── lib/
     ├── key-utils.ts             # ⭐ sanitizeKey() — shared private key sanitizer
@@ -94,7 +102,10 @@ src/
     ├── firebase-admin.ts        # Firebase Admin SDK (server actions only)
     ├── google.ts                # Google Calendar — addToGoogleCalendar()
     ├── fsm_logic.ts             # ⭐ FSM — isValidTransition(), JOB_WORKFLOW
-    ├── validation.ts            # Zod schemas + validateQuote/Job/Client/Booking/Id
+    ├── invoice.ts               # ⭐ computeInvoiceTotals() — SINGLE source of truth for invoice math + getDueDate()
+    ├── business.ts              # BUSINESS consts (name/phone/HST), formatInvoiceNumber(), PAYMENT_TERMS_DAYS
+    ├── job-status.ts            # STATUS_META — human labels + colors for job statuses (no raw enums in UI)
+    ├── validation.ts            # Zod schemas + validateQuote/Job/Client/Booking/Id (Job update includes lineItems)
     ├── errors.ts                # AppError class + handleServerActionError()
     ├── rate-limit.ts            # In-memory rate limiting (quote: 5/15min, login: 5/5min)
     ├── env-validator.ts         # requireValidEnv() called at startup in layout.tsx
@@ -149,7 +160,7 @@ CANCELLED     → SCHEDULED  (reschedule)
 5. `admin/layout.tsx` re-verifies server-side as double check
 
 ### Data Access
-- **Public**: GET jobs where status is `INVOICED` or `PAID` only
+- **Public**: GET jobs where status is `INVOICED`, `UNPAID`, or `PAID` only (UNPAID included so overdue customers — flagged by the reminder cron — can still load and pay their invoice; see `firestore.rules`)
 - **Writes**: Server Actions via Firebase Admin SDK (bypasses Firestore rules)
 - **Admin reads**: Client SDK with `onSnapshot` (Firestore rules enforce auth)
 
@@ -198,10 +209,18 @@ CANCELLED     → SCHEDULED  (reschedule)
 - Use `sanitizeKey()` from `@/lib/key-utils` for any private key/secret env var
 - Do NOT inline `key.replace(/['"]/g, "").replace(/\\n/g, "\n")` — it already exists
 
-### InvoiceEmail
-- Component is at `src/components/email/InvoiceEmail.tsx`
-- Props: `{ clientName, service, amount, invoiceUrl, invoiceId }`
-- Called in `emailInvoice()` server action — must pass `service: job.service`
+### Invoices (single source of truth)
+- **Never recompute invoice totals inline.** Use `computeInvoiceTotals(job)` from `@/lib/invoice` — used by the web invoice, the email, Stripe checkout, and the admin views. It normalizes `lineItems` (falls back to `service`+`price`), applies discount then tax, rounds to cents.
+- `InvoiceEmail` props: `{ clientName, invoiceNumber, invoiceUrl, lineItems, subtotal, discount, taxRate, taxAmount, total, dueDate, business }`.
+- Sequential numbers via `assignInvoiceNumber(jobRef)` in `actions.ts` — a Firestore transaction on `counters/invoices`. **Idempotent**: re-sending an invoiced job does NOT bump the number. Assigned on first `→ INVOICED` (both `emailInvoice` and a manual `updateJobStatus`).
+- Business identity (name, address, phone, HST#) lives in `@/lib/business` `BUSINESS`.
+
+### Getting paid + auto-chase
+- **Manual payment** (e-transfer/cash): `markInvoicePaid(jobId, method)` action. Stripe payments flow through the webhook (`paymentMethod:'card'`).
+- **Receipt email**: both payment paths call `sendPaymentReceipt(jobId)` from `src/lib/server/payment-receipt.ts` (server-only, non-blocking) → emails a paid-in-full receipt via `PaymentReceiptEmail`.
+- **Overdue / reminders**: predicates `isOverdue(job, now)` and `isReminderDue(job, now)` in `@/lib/invoice` (gentle policy: remind once overdue, then every 3 days, max 3). **Unit-tested — change the policy there, not inline.**
+- **Cron**: `vercel.json` runs `GET /api/cron/invoice-reminders` daily (14:00 UTC). It auto-flags overdue `INVOICED→UNPAID` and sends due reminders. Auth: requires `Authorization: Bearer $CRON_SECRET` (Vercel injects this) — **fails closed** (503) if `CRON_SECRET` unset, 401 on mismatch.
+- ⚠️ **`"use server"` gotcha**: every export from `actions.ts` is a PUBLIC endpoint. The unauthenticated reminder body lives in `src/lib/server/invoice-reminder.ts` (`import 'server-only'`) so it's reachable only from the admin action (gated by `requireAdmin`) and the cron route (gated by `CRON_SECRET`) — never expose it as an action.
 
 ---
 
@@ -210,11 +229,12 @@ CANCELLED     → SCHEDULED  (reschedule)
 1. **Rate limiting resets on cold start** — in-memory. Fine for now; upgrade to Redis/Firestore for scale.
 2. **Geocoding defaults to mock** — `MOCK_GEOCODING=false` in env enables real Google Maps. Currently hardcodes Toronto coords.
 3. **`services.ts` only has `logEvent`** — the rest was dead code and was removed. If Supabase isn't configured, logEvent silently no-ops.
-4. **Admin page is a single large component** — major refactor target. Extract JobCard, KPI strip, RevenueChart, ScheduleModal, InvoiceSettingsModal.
-5. **`alert()`/`confirm()` throughout admin** — replace with toast (sonner) when refactoring admin.
-6. **No real testimonials yet** — testimonials section intentionally removed. Add back when real Google reviews exist. Wire up Google Reviews embed or screenshot.
-7. **Before/after gallery missing** — high-conversion section, not built yet. Add when the team has real job photos. Placeholder slot exists in the plan.
-8. **Hover states in page.tsx use inline `onMouseEnter/Leave`** — because Tailwind 4 doesn't support arbitrary `hover:bg-[#hex]` with dynamic values. If refactoring, consider extracting button variants.
+4. **Admin page is dense but manageable (~190 lines).** If it grows, extract JobCard, KPI strip, RevenueChart, ScheduleModal, InvoiceSettingsModal. The inline `<aside>` sidebar is duplicated across `admin/page.tsx`, `admin/invoices/page.tsx`, and `admin/clients/page.tsx` — keep nav links in sync (candidate to extract into one `<AdminSidebar>`).
+5. **Toasts + confirms** — admin uses `sonner` (`<Toaster>` in root `layout.tsx`). Success/error → `toast.success/error`. Destructive confirms → `useConfirm()` from `@/components/ui/ConfirmDialog` (provider in `admin/layout.tsx`). **Don't reintroduce `alert()`/`confirm()`.**
+6. **Testimonials are placeholder** — `Testimonials` in `src/app/landing-conversion.tsx` renders a "coming soon" prompt while its `testimonials` array is empty. ⚠️ Fill with REAL reviews only — fake reviews violate Canada's Competition Act.
+7. **Before/after gallery** — `BeforeAfterGallery` in `src/app/landing-conversion.tsx`. Fill each item's `before`/`after` image paths (in `/public`) to switch a tile from "photo coming soon" to an interactive drag-slider.
+8. **`submitQuote` sends an instant customer confirmation** (email via `QuoteConfirmationEmail` + SMS) through `sendQuoteConfirmation()`. It's **non-blocking** — a missing Resend/Twilio key or send failure is caught and logged, never failing lead capture. Keep it that way.
+9. **Hover states in page.tsx use inline `onMouseEnter/Leave`** — because Tailwind 4 doesn't support arbitrary `hover:bg-[#hex]` with dynamic values. If refactoring, consider extracting button variants.
 
 ---
 
@@ -245,6 +265,8 @@ GOOGLE_CALENDAR_ID          # Calendar sync on booking
 NEXT_PUBLIC_SUPABASE_URL    # Audit logging
 SUPABASE_SERVICE_ROLE_KEY
 MOCK_GEOCODING              # Set to "false" for real Google Maps geocoding
+BUSINESS_HST_NUMBER         # HST/GST number shown on invoices (hidden if unset)
+CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in Vercel; route fails closed if unset)
 ```
 
 ---
@@ -265,10 +287,21 @@ MOCK_GEOCODING              # Set to "false" for real Google Maps geocoding
   discount?: number;
   taxRate?: number;
   invoiceNotes?: string;
+  lineItems?: { description: string; quantity: number; unitPrice: number }[];  // optional; falls back to service+price
+  invoiceNumber?: number;   // sequential, assigned (idempotent) on first → INVOICED
+  invoicedAt?: Timestamp;   // when invoiceNumber was assigned; due date = +14 days
+  paidAt?: Timestamp;       // set on payment (Stripe webhook or manual Mark Paid)
+  paymentMethod?: 'etransfer' | 'cash' | 'card';   // 'card' = Stripe; others = manual
+  amountPaid?: number;
+  stripePaymentId?: string;
+  reminderCount?: number;   // # of overdue reminders sent (cron caps at 3)
+  lastReminderAt?: Timestamp;
   scheduledDate?: string;
   createdAt: Timestamp;
   lastUpdated?: Timestamp;
 }
+
+// counters/invoices { current: number } — atomic sequential invoice numbering (seed 1000).
 ```
 
 ### `clients`
@@ -296,10 +329,13 @@ MOCK_GEOCODING              # Set to "false" for real Google Maps geocoding
 | `/quote` | Public | Quote submission |
 | `/login` | Public | Admin login |
 | `/admin` | Protected | Job dashboard |
+| `/admin/invoices` | Protected | Invoices list (INVOICED/UNPAID/PAID) |
+| `/admin/schedule` | Protected | Month calendar of scheduled jobs |
 | `/admin/clients` | Protected | Client list |
 | `/admin/clients/[id]` | Protected | Client detail |
 | `/invoice/[id]` | Semi-public | Invoice (INVOICED/PAID only) |
 | `/api/webhooks/stripe` | Stripe | Payment confirmation |
+| `/api/cron/invoice-reminders` | CRON_SECRET | Daily auto-chase of overdue invoices |
 
 ---
 

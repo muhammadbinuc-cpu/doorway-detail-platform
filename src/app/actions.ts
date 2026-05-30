@@ -7,6 +7,7 @@
 import { revalidatePath } from "next/cache";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
+import type { DocumentReference } from "firebase-admin/firestore";
 import { addToGoogleCalendar } from "@/lib/google";
 import { cookies } from 'next/headers';
 import { Resend } from 'resend';
@@ -14,7 +15,12 @@ import twilio from 'twilio';
 import { ServiceLayer } from '@/lib/services';
 import Stripe from 'stripe';
 import { ZodError } from 'zod';
-import InvoiceEmail from "@/components/email/InvoiceEmail"; // <--- ADDED IMPORT
+import InvoiceEmail from "@/components/email/InvoiceEmail";
+import QuoteConfirmationEmail from "@/components/email/QuoteConfirmationEmail";
+import { computeInvoiceTotals, getDueDate } from "@/lib/invoice";
+import { BUSINESS, INVOICE_NUMBER_START, formatInvoiceNumber } from "@/lib/business";
+import { runInvoiceReminder } from "@/lib/server/invoice-reminder";
+import { sendPaymentReceipt } from "@/lib/server/payment-receipt";
 
 // 🔒 Security imports
 import { handleServerActionError, createFsmError, AppError } from '@/lib/errors';
@@ -24,6 +30,7 @@ import {
     validateClient,
     validateId,
     validateBooking,
+    validatePaymentMethod,
 } from '@/lib/validation';
 import { enforceRateLimit, resetRateLimit } from '@/lib/rate-limit';
 import { isValidTransition, JOB_WORKFLOW } from '@/lib/fsm_logic';
@@ -81,6 +88,39 @@ async function requireAdmin() {
     } catch (error) {
         throw new AppError('unauthorized', `Session invalid: ${getErrorCode(error)}`, 'Session expired.');
     }
+}
+
+/**
+ * 🔒 Atomically assign a sequential invoice number to a job (idempotent).
+ * Runs in a transaction so concurrent sends can't collide, and re-sending an
+ * already-invoiced job never bumps the number. Returns the job's number + issue date.
+ */
+async function assignInvoiceNumber(
+    jobRef: DocumentReference
+): Promise<{ invoiceNumber: number; invoicedAt: Date }> {
+    const counterRef = adminDb.collection("counters").doc("invoices");
+
+    return adminDb.runTransaction(async (tx) => {
+        const jobSnap = await tx.get(jobRef);
+        const job = jobSnap.data();
+        if (!job) throw new AppError('not-found', `Job ${jobRef.id} not found`, 'Job not found');
+
+        // Idempotent: already invoiced → return existing number, don't bump.
+        if (typeof job.invoiceNumber === "number" && job.invoiceNumber > 0) {
+            const existingAt = job.invoicedAt?.toDate?.() ?? new Date();
+            return { invoiceNumber: job.invoiceNumber, invoicedAt: existingAt };
+        }
+
+        const counterSnap = await tx.get(counterRef);
+        const current = counterSnap.exists ? (counterSnap.data()?.current ?? INVOICE_NUMBER_START) : INVOICE_NUMBER_START;
+        const next = current + 1;
+
+        const invoicedAt = new Date();
+        tx.set(counterRef, { current: next }, { merge: true });
+        tx.update(jobRef, { invoiceNumber: next, invoicedAt: Timestamp.fromDate(invoicedAt) });
+
+        return { invoiceNumber: next, invoicedAt };
+    });
 }
 
 // ============================================
@@ -145,11 +185,53 @@ export async function submitQuote(formData: unknown) {
             clientId, name, email, phone, address, service, status: "LEAD_RECEIVED", createdAt: Timestamp.now()
         });
 
+        // 🟢 Instant confirmation to the customer — non-blocking: a missing
+        // Resend/Twilio key (or a send failure) must NEVER fail lead capture.
+        await sendQuoteConfirmation({ name, email, phone, service });
+
         return { success: true, jobId: newJob.id };
     } catch (error) {
         if (error instanceof ZodError) return { success: false, error: error.issues[0].message };
         return handleServerActionError(error, 'submitQuote');
     }
+}
+
+/**
+ * Fire-and-forget confirmation to a new lead. Each channel is independently
+ * guarded; the whole helper never throws so it can't break submitQuote.
+ */
+async function sendQuoteConfirmation(lead: { name: string; email: string; phone: string; service: string }) {
+    // Show the services list without the internal notes/meta suffix.
+    const services = lead.service.split(" | ")[0] || lead.service;
+
+    try {
+        const resendClient = getResend();
+        await resendClient.emails.send({
+            from: 'DoorWay Detail <onboarding@resend.dev>',
+            to: lead.email,
+            subject: 'We got your request — DoorWay Detail',
+            react: QuoteConfirmationEmail({ clientName: lead.name, services, business: BUSINESS }),
+        });
+    } catch (e) {
+        console.error("Quote confirmation email failed (non-blocking):", e);
+    }
+
+    if (lead.phone) {
+        try {
+            const twilio = getTwilioClient();
+            await twilio.messages.create({
+                body: `Hi ${lead.name}, ${BUSINESS.name} received your request for ${services}. We'll text or call shortly to confirm. — ${BUSINESS.phone}`,
+                from: process.env.TWILIO_FROM_NUMBER,
+                to: lead.phone,
+            });
+        } catch (e) {
+            console.error("Quote confirmation SMS failed (non-blocking):", e);
+        }
+    }
+
+    try {
+        await ServiceLayer.logEvent('QUOTE_CONFIRMATION_SENT', { email: lead.email });
+    } catch { /* logging is best-effort */ }
 }
 
 // ============================================
@@ -222,6 +304,12 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
             throw createFsmError(job.status, newStatus, JOB_WORKFLOW[job.status] || []);
         }
 
+        // Assign a sequential invoice number the first time a job becomes INVOICED
+        // (so jobs flipped manually via the dropdown still get a real number).
+        if (newStatus === 'INVOICED') {
+            await assignInvoiceNumber(jobRef);
+        }
+
         await jobRef.update({ status: newStatus, lastUpdated: Timestamp.now() });
         revalidatePath("/admin");
         return { success: true };
@@ -287,24 +375,28 @@ export async function emailInvoice(jobId: string) {
         if (!job?.email) throw new AppError('validation-error', 'No email on job', 'Customer email not found');
         await ServiceLayer.logEvent('INVOICE_SENT', { jobId, email: job.email });
 
-        const price = Number(job.price) || 0;
-        const discount = Number(job.discount) || 0;
-        const subtotal = price - discount;
-        const taxRate = Number(job.taxRate) || 0;
-        const taxAmount = subtotal * (taxRate / 100);
-        const total = subtotal + taxAmount;
+        // Assign a real sequential invoice number (idempotent) before sending.
+        const { invoiceNumber, invoicedAt } = await assignInvoiceNumber(jobRef);
+        const totals = computeInvoiceTotals(job);
+        const dueDate = getDueDate(invoicedAt);
 
-        // 🟢 UPDATED: Sending Professional React Email
+        // 🟢 Professional React Email with full breakdown.
         const { error } = await resendClient.emails.send({
             from: 'DoorWay Detail <onboarding@resend.dev>',
             to: job.email,
-            subject: `Invoice #${jobId.slice(0, 6).toUpperCase()} from DoorWay Detail`,
+            subject: `Invoice ${formatInvoiceNumber(invoiceNumber, jobId)} from DoorWay Detail`,
             react: InvoiceEmail({
                 clientName: job.name,
-                service: job.service || 'Cleaning Service',
-                amount: Number(total),
+                invoiceNumber: formatInvoiceNumber(invoiceNumber, jobId),
                 invoiceUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}`,
-                invoiceId: jobId,
+                lineItems: totals.lineItems,
+                subtotal: totals.subtotal,
+                discount: totals.discount,
+                taxRate: totals.taxRate,
+                taxAmount: totals.taxAmount,
+                total: totals.total,
+                dueDate: dueDate.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }),
+                business: BUSINESS,
             }),
         });
 
@@ -326,6 +418,51 @@ export async function emailInvoice(jobId: string) {
     } catch (error) {
         return handleServerActionError(error, 'emailInvoice');
     }
+}
+
+/**
+ * 🔒 Manually mark an invoice paid (e-transfer / cash / card) — for payments
+ * collected outside Stripe. Stripe payments are handled by the webhook.
+ */
+export async function markInvoicePaid(jobId: string, method: string) {
+    await requireAdmin();
+    try {
+        validateId(jobId);
+        const validMethod = validatePaymentMethod(method);
+        const jobRef = adminDb.collection("jobs").doc(jobId);
+        const job = (await jobRef.get()).data();
+        if (!job) throw new AppError('not-found', `Job ${jobId} not found`, 'Job not found');
+        if (!PAYABLE_STATUSES.has(job.status)) {
+            throw new AppError('validation-error', `Job ${jobId} not payable from ${job.status}`, 'This invoice cannot be marked paid.');
+        }
+
+        const { total } = computeInvoiceTotals(job);
+        await ServiceLayer.logEvent('INVOICE_MARKED_PAID', { jobId, method: validMethod, amount: total });
+        await jobRef.update({
+            status: 'PAID',
+            paidAt: Timestamp.now(),
+            paymentMethod: validMethod,
+            amountPaid: total,
+            lastUpdated: Timestamp.now(),
+        });
+        await sendPaymentReceipt(jobId); // non-blocking
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error) {
+        if (error instanceof ZodError) return { success: false, error: error.issues[0].message };
+        return handleServerActionError(error, 'markInvoicePaid');
+    }
+}
+
+/**
+ * 🔒 Manual "Send reminder" button for an overdue/unpaid invoice. The actual
+ * send lives in a server-only module so it's never exposed as a public action.
+ */
+export async function sendInvoiceReminder(jobId: string) {
+    await requireAdmin();
+    const res = await runInvoiceReminder(jobId);
+    if (res.success) revalidatePath("/admin");
+    return res;
 }
 
 export async function sendOnMyWay(jobId: string) {
@@ -353,7 +490,9 @@ export async function createRecurringJob(originalJobId: string) {
         if (!originalJob) throw new AppError('not-found', `Job not found`, 'Job not found');
 
         const newJob = await adminDb.collection("jobs").add({
-            ...originalJob, status: "LEAD_RECEIVED", createdAt: Timestamp.now(), scheduledDate: null, service: originalJob.service + " (Recurring)", price: originalJob.price
+            ...originalJob, status: "LEAD_RECEIVED", createdAt: Timestamp.now(), scheduledDate: null, service: originalJob.service + " (Recurring)", price: originalJob.price,
+            // Don't carry the prior invoice identity onto the new cycle.
+            invoiceNumber: null, invoicedAt: null,
         });
         revalidatePath("/admin");
         return { success: true, jobId: newJob.id };
@@ -371,10 +510,7 @@ export async function createCheckoutSession(jobId: string) {
             throw new AppError('validation-error', `Job ${validJobId} is not payable from status ${job.status}`, 'This invoice is not available for payment.');
         }
 
-        const price = Number(job.price) || 0;
-        const discount = Number(job.discount) || 0;
-        const taxRate = Number(job.taxRate) || 0;
-        const total = (price - discount) * (1 + (taxRate / 100));
+        const { total } = computeInvoiceTotals(job);
         const amountInCents = Math.round(total * 100);
         if (amountInCents <= 0) {
             throw new AppError('validation-error', `Job ${validJobId} has non-positive invoice total`, 'This invoice cannot be paid online.');

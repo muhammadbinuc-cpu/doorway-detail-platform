@@ -39,6 +39,12 @@ const OPTIONAL_VARS = [
     // Supabase (audit logging)
     'NEXT_PUBLIC_SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
+
+    // Business identity — HST/GST number shown on invoices
+    'BUSINESS_HST_NUMBER',
+
+    // Auto-chase: secret that authenticates the Vercel Cron invoice-reminder route
+    'CRON_SECRET',
 ] as const;
 
 interface ValidationResult {

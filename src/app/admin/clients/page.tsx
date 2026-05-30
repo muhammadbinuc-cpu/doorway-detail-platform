@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { Loader2, Search, Plus, Phone, Mail, LayoutDashboard, Users, LogOut } from "lucide-react";
+import { Loader2, Search, Plus, Phone, Mail } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 // IMPORT ACTIONS
 import { createClient, createJobFromClient } from "@/app/actions";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 interface Client {
     id: string;
@@ -64,9 +66,9 @@ export default function ClientsPage() {
         if (result.success) {
             setIsModalOpen(false);
             setNewClient({ name: "", email: "", phone: "", address: "", propertyNotes: "" });
-            alert("✅ Client Added!");
+            toast.success("Client added");
         } else {
-            alert("❌ Failed: " + ('error' in result ? result.error : 'Unknown error'));
+            toast.error(('error' in result ? result.error : undefined) || 'Failed to add client');
         }
     };
 
@@ -81,20 +83,7 @@ export default function ClientsPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans text-black">
-            <aside className="w-full md:w-64 bg-black/90 backdrop-blur-xl border-r border-white/10 text-white p-6 flex flex-col">
-                <h1 className="text-2xl font-black italic mb-8">DOORWAY <span className="text-[#D4AF37]">DETAIL</span></h1>
-                <nav className="space-y-2 flex-1">
-                    <Link href="/admin" className="text-gray-400 hover:text-white hover:bg-white/5 px-4 py-3 rounded-xl font-bold flex items-center gap-3 transition-all block">
-                        <LayoutDashboard size={20} /> Dashboard
-                    </Link>
-                    <div className="bg-white/10 text-[#D4AF37] px-4 py-3 rounded-xl font-bold flex items-center gap-3">
-                        <Users size={20} /> Clients
-                    </div>
-                </nav>
-                <button onClick={() => signOut(auth)} className="text-gray-400 hover:text-white flex items-center gap-2 transition-colors mt-8">
-                    <LogOut size={16} /> Sign Out
-                </button>
-            </aside>
+            <AdminSidebar active="clients" />
 
             <main className="flex-1 p-6 md:p-10 overflow-auto">
                 <div className="max-w-6xl mx-auto">
@@ -145,10 +134,10 @@ export default function ClientsPage() {
                                                     onClick={async () => {
                                                         const result = await createJobFromClient(client.id);
                                                         if (result.success) {
-                                                            alert("✅ Job created successfully!");
+                                                            toast.success("Job created");
                                                             router.push("/admin");
                                                         } else {
-                                                            alert("❌ Failed: " + ('error' in result ? result.error : 'Failed to create job'));
+                                                            toast.error(('error' in result ? result.error : undefined) || 'Failed to create job');
                                                         }
                                                     }}
                                                     className="text-sm font-bold bg-black text-white px-3 py-1 rounded-lg hover:bg-[#D4AF37] hover:text-black transition-colors"

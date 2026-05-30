@@ -49,6 +49,16 @@ const percentageSchema = z.number()
     .max(100, 'Percentage cannot exceed 100')
     .transform((val) => Math.round(val * 100) / 100);
 
+// 🔒 Line item validation (one row of an invoice)
+const lineItemSchema = z.object({
+    description: sanitizedString(1, 200),
+    quantity: z.number()
+        .min(1, 'Quantity must be at least 1')
+        .max(999, 'Quantity exceeds maximum allowed')
+        .transform((val) => Math.round(val)),
+    unitPrice: priceSchema,
+});
+
 // 🔒 Invoice notes validation (optional, sanitized)
 const notesSchema = z.string()
     .max(2000, 'Notes cannot exceed 2000 characters')
@@ -70,6 +80,15 @@ const JOB_STATUSES = [
 const jobStatusSchema = z.enum(JOB_STATUSES, {
     message: 'Invalid job status'
 });
+
+// 🔒 Payment method for manually-recorded (non-Stripe) payments
+const PAYMENT_METHODS = ['etransfer', 'cash', 'card'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+const paymentMethodSchema = z.enum(PAYMENT_METHODS, { message: 'Invalid payment method' });
+
+export function validatePaymentMethod(method: string): PaymentMethod {
+    return paymentMethodSchema.parse(method);
+}
 
 // 🔒 Firestore document ID validation
 const firestoreIdSchema = z.string()
@@ -99,7 +118,8 @@ export const JobUpdateSchema = z.object({
     price: priceSchema.optional(),
     discount: priceSchema.optional(),
     taxRate: percentageSchema.optional(),  // ✅ Now allows 0
-    invoiceNotes: notesSchema
+    invoiceNotes: notesSchema,
+    lineItems: z.array(lineItemSchema).max(50, 'Too many line items').optional(),
 }).refine(
     (data) => Object.keys(data).length > 0,
     { message: 'At least one field must be provided' }

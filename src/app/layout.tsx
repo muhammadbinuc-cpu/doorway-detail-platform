@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Montserrat, DM_Sans } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 import { requireValidEnv } from "@/lib/env-validator";
@@ -43,6 +44,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${montserrat.variable} ${dmSans.variable} antialiased`}>
         {children}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

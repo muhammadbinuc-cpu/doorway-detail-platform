@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import Stripe from "stripe";
 import { validateId } from "@/lib/validation";
+import { sendPaymentReceipt } from "@/lib/server/payment-receipt";
 
 // --- STRIPE INIT (LAZY LOADING) ---
 let _stripe: Stripe | null = null;
@@ -56,9 +57,12 @@ export async function POST(req: Request) {
             await adminDb.collection("jobs").doc(jobId).update({
                 status: "PAID",
                 paidAt: Timestamp.now(),
+                paymentMethod: "card",
                 stripePaymentId: session.payment_intent as string,
                 amountPaid: session.amount_total ? session.amount_total / 100 : 0
             });
+
+            await sendPaymentReceipt(jobId); // non-blocking receipt email
         } else {
             console.warn("⚠️ Payment received but no Job ID in metadata.");
         }

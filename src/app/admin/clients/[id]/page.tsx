@@ -6,7 +6,10 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebas
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, MapPin, Phone, Mail, Loader2, Trash2, Save, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { createJobFromClient, deleteClient, updateClientNotes } from "@/app/actions";
+import { statusMeta } from "@/lib/job-status";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface ClientProfileData {
     id: string;
@@ -36,6 +39,7 @@ export default function ClientProfile() {
     const [notes, setNotes] = useState("");
     const [savingNotes, setSavingNotes] = useState(false);
     const router = useRouter();
+    const confirm = useConfirm();
 
     useEffect(() => {
         if (!id) return;
@@ -57,25 +61,26 @@ export default function ClientProfile() {
     }, [id]);
 
     const handleNewJob = async () => {
-        if (!confirm("Start a new job?")) return;
+        if (!(await confirm({ message: "Start a new job for this client?", confirmText: "Start job" }))) return;
         setCreatingJob(true);
         const res = await createJobFromClient(id);
-        if (res.success) router.push("/admin");
-        else { alert('error' in res ? res.error : 'Failed to create job'); setCreatingJob(false); }
+        if (res.success) { toast.success("Job created"); router.push("/admin"); }
+        else { toast.error(('error' in res ? res.error : undefined) || 'Failed to create job'); setCreatingJob(false); }
     };
 
     const handleDelete = async () => {
-        if (!confirm("⚠️ ARE YOU SURE? This will permanently delete this client.")) return;
+        if (!(await confirm({ title: "Delete client?", message: "This permanently deletes the client.", danger: true, confirmText: "Delete" }))) return;
         const res = await deleteClient(id);
-        if (res.success) router.push("/admin/clients");
-        else alert('error' in res ? res.error : 'Failed to delete client');
+        if (res.success) { toast.success("Client deleted"); router.push("/admin/clients"); }
+        else toast.error(('error' in res ? res.error : undefined) || 'Failed to delete client');
     };
 
     const handleSaveNotes = async () => {
         setSavingNotes(true);
-        await updateClientNotes(id, notes);
+        const res = await updateClientNotes(id, notes);
         setSavingNotes(false);
-        alert("Notes saved!");
+        if (res.success) toast.success("Notes saved");
+        else toast.error(('error' in res ? res.error : undefined) || 'Failed to save notes');
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
@@ -131,9 +136,7 @@ export default function ClientProfile() {
                                             <h4 className="font-bold">{job.service}</h4>
                                             <p className="text-xs text-gray-400">{job.createdAt?.seconds ? new Date(job.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${job.status === 'PAID' ? 'bg-green-100 text-green-700' :
-                                            job.status === 'INVOICED' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-800'
-                                            }`}>{job.status}</span>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusMeta(job.status || '').pill}`}>{statusMeta(job.status || '').label}</span>
                                     </div>
                                 ))}
                             </div>

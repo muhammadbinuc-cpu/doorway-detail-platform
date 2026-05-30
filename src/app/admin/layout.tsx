@@ -4,6 +4,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { adminAuth } from '@/lib/firebase-admin';
+import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 
 const SESSION_COOKIE_NAME = '__session';
 
@@ -31,5 +32,5 @@ export default async function AdminLayout({
     redirect('/login');
   }
 
-  return <>{children}</>;
+  return <ConfirmProvider>{children}</ConfirmProvider>;
 }

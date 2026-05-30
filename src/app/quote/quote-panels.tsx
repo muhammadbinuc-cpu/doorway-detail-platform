@@ -19,6 +19,10 @@ export function QuoteSuccess({ name }: { name: string }) {
         Thank you, <span className="font-bold text-white">{name}</span>. We will contact you shortly to confirm the details and next steps.
       </p>
 
+      <p className="mt-4 max-w-lg text-sm font-semibold text-[#C9A227]">
+        Check your email and phone — a confirmation is on its way.
+      </p>
+
       <Link
         href="/"
         className="mt-10 inline-flex items-center gap-3 rounded-lg bg-[#C9A227] px-8 py-4 text-lg font-black text-black transition hover:bg-white"

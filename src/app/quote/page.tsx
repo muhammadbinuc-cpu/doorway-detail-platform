@@ -14,6 +14,7 @@ import {
   Sparkles,
   User,
 } from "lucide-react";
+import { toast } from "sonner";
 import { submitQuote } from "../actions";
 import { BrandMark } from "../brand-mark";
 import { QuoteIntro, QuoteSuccess } from "./quote-panels";
@@ -104,7 +105,7 @@ export default function QuotePage() {
       throw new Error(result.error || "Submission failed");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      alert(`Something went wrong: ${message}.`);
+      toast.error(`Something went wrong: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -165,6 +166,7 @@ export default function QuotePage() {
                       <input
                         type="text"
                         name="name"
+                        autoComplete="name"
                         value={formData.name}
                         onChange={handleChange}
                         className="w-full rounded-lg border border-black/12 bg-[#f8f5ee] py-4 pl-12 pr-4 font-semibold text-black outline-none transition focus:border-[#C9A227]"
@@ -183,6 +185,8 @@ export default function QuotePage() {
                         <input
                           type="email"
                           name="email"
+                          autoComplete="email"
+                          inputMode="email"
                           value={formData.email}
                           onChange={handleChange}
                           className="w-full rounded-lg border border-black/12 bg-[#f8f5ee] py-4 pl-12 pr-4 font-semibold text-black outline-none transition focus:border-[#C9A227]"
@@ -198,6 +202,8 @@ export default function QuotePage() {
                         <input
                           type="tel"
                           name="phone"
+                          autoComplete="tel"
+                          inputMode="tel"
                           value={formData.phone}
                           onChange={handleChange}
                           className="w-full rounded-lg border border-black/12 bg-[#f8f5ee] py-4 pl-12 pr-4 font-semibold text-black outline-none transition focus:border-[#C9A227]"
@@ -229,6 +235,7 @@ export default function QuotePage() {
                       <input
                         type="text"
                         name="address"
+                        autoComplete="street-address"
                         value={formData.address}
                         onChange={handleChange}
                         className="w-full rounded-lg border border-black/12 bg-[#f8f5ee] py-4 pl-12 pr-4 font-semibold text-black outline-none transition focus:border-[#C9A227]"

@@ -24,6 +24,7 @@ import {
   trustChips,
 } from "./landing-parts";
 import { BrandMark } from "./brand-mark";
+import { BeforeAfterGallery, Testimonials } from "./landing-conversion";
 
 const gold = "#C9A227";
 const dGold = "#6B5010";
@@ -229,51 +230,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── BEFORE / AFTER (placeholder until photo set is delivered) ── */}
-      <section className="px-5 py-20 lg:px-8 lg:py-24">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-12 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
-                Before &amp; after
-              </p>
-              <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
-                See the difference, side by side.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-black/65">
-                Real jobs. Same surface, before and after.
-              </p>
-            </div>
-            <a
-              href="tel:289-772-5757"
-              className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-black/15 bg-white px-5 py-3 text-sm font-black text-black transition hover:border-black lg:self-end"
-            >
-              <Phone size={16} />
-              Book yours: 289-772-5757
-            </a>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {["Driveway pressure wash", "Window restoration", "Gutter flush", "Full exterior reset"].map((label) => (
-              <div
-                key={label}
-                className="flex aspect-[16/10] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-black/15 bg-[#F5F4F0] p-6 text-center"
-              >
-                <div
-                  className="grid h-10 w-10 place-items-center rounded-full"
-                  style={{ backgroundColor: `${gold}22`, color: dGold }}
-                >
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                </div>
-                <p className="text-sm font-black text-black">{label}</p>
-                <p className="text-xs text-black/45">Photo coming soon</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── BEFORE / AFTER ── */}
+      <BeforeAfterGallery />
 
       {/* ── HOW WE KEEP YOU UPDATED ── */}
       <section className="px-5 py-20 lg:px-8 lg:py-24">
@@ -421,6 +379,9 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
+
+      {/* ── TESTIMONIALS ── */}
+      <Testimonials />
 
       {/* ── FAQ ── */}
       <section className="bg-[#F5F4F0] px-5 py-20 lg:px-8 lg:py-24">
