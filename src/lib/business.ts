@@ -7,8 +7,10 @@ export const BUSINESS = {
     phone: "289-772-5757",
     email: "Doorwaydetail@gmail.com",
     // HST/GST number is legally required on invoices for a registered business.
-    // Set BUSINESS_HST_NUMBER in env to display it; falls back to empty (hidden) if unset.
-    hstNumber: process.env.BUSINESS_HST_NUMBER || "",
+    // Prefer NEXT_PUBLIC_BUSINESS_HST_NUMBER so it's available in client components
+    // (the public invoice page); fall back to the server-only var for email contexts.
+    // An HST number is printed publicly on invoices, so exposing it client-side is fine.
+    hstNumber: process.env.NEXT_PUBLIC_BUSINESS_HST_NUMBER || process.env.BUSINESS_HST_NUMBER || "",
 } as const;
 
 export type Business = typeof BUSINESS;

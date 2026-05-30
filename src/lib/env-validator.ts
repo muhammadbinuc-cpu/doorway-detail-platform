@@ -40,8 +40,9 @@ const OPTIONAL_VARS = [
     'NEXT_PUBLIC_SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
 
-    // Business identity — HST/GST number shown on invoices
-    'BUSINESS_HST_NUMBER',
+    // Business identity — HST/GST number shown on invoices.
+    // Use the NEXT_PUBLIC_ variant so it renders on the public (client) invoice page.
+    'NEXT_PUBLIC_BUSINESS_HST_NUMBER',
 
     // Auto-chase: secret that authenticates the Vercel Cron invoice-reminder route
     'CRON_SECRET',

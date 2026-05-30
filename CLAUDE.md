@@ -265,7 +265,7 @@ GOOGLE_CALENDAR_ID          # Calendar sync on booking
 NEXT_PUBLIC_SUPABASE_URL    # Audit logging
 SUPABASE_SERVICE_ROLE_KEY
 MOCK_GEOCODING              # Set to "false" for real Google Maps geocoding
-BUSINESS_HST_NUMBER         # HST/GST number shown on invoices (hidden if unset)
+NEXT_PUBLIC_BUSINESS_HST_NUMBER  # HST/GST number on invoices. MUST be NEXT_PUBLIC_ — the invoice page is a client component, so a server-only var won't render there (falls back to BUSINESS_HST_NUMBER for email-only contexts).
 CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in Vercel; route fails closed if unset)
 ```
 
