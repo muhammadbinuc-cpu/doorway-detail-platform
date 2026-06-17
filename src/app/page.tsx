@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   Check,
+  Lock,
   Mail,
   Phone,
   ShieldCheck,
@@ -73,33 +74,60 @@ const returnPerks = [
 export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-white text-[#111111]">
-
       {/* ── NAV ── */}
       <header className="fixed inset-x-0 top-0 z-50 border-b border-black/8 bg-white/92 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4 lg:px-8">
-          <Link href="/" aria-label="Doorway Detail home" className="text-base text-black sm:text-lg">
+          <Link
+            href="/"
+            aria-label="Doorway Detail home"
+            className="text-base text-black sm:text-lg"
+          >
             <BrandMark />
           </Link>
           <nav className="hidden items-center gap-7 text-sm font-semibold text-black/60 lg:flex">
-            <a href="#services" className="transition hover:text-black">Services</a>
-            <a href="#how-it-works" className="transition hover:text-black">How It Works</a>
-            <a href="#why-doorway" className="transition hover:text-black">Why Doorway</a>
+            <a href="#services" className="transition hover:text-black">
+              Services
+            </a>
+            <a href="#how-it-works" className="transition hover:text-black">
+              How It Works
+            </a>
+            <a href="#why-doorway" className="transition hover:text-black">
+              Why Doorway
+            </a>
+            <Link href="/login" className="transition hover:text-black">
+              Staff Login
+            </Link>
           </nav>
           <div className="hidden items-center gap-3 md:flex">
-            <a href="tel:289-772-5757" className="inline-flex items-center gap-2 text-sm font-bold text-black/65 transition hover:text-black">
+            <a
+              href="tel:289-772-5757"
+              className="inline-flex items-center gap-2 text-sm font-bold text-black/65 transition hover:text-black"
+            >
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ backgroundColor: gold }} />
-                <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: gold }} />
+                <span
+                  className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                  style={{ backgroundColor: gold }}
+                />
+                <span
+                  className="relative inline-flex h-2 w-2 rounded-full"
+                  style={{ backgroundColor: gold }}
+                />
               </span>
               <Phone size={16} />
               289-772-5757
             </a>
-            <Link href="/quote" className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-3 text-sm font-black text-white transition hover:bg-[#C9A227] hover:text-black">
+            <Link
+              href="/quote"
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-3 text-sm font-black text-white transition hover:bg-[#C9A227] hover:text-black"
+            >
               Get a Quote
               <ArrowRight size={16} />
             </Link>
           </div>
-          <Link href="/quote" className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-3 text-sm font-black text-white md:hidden">
+          <Link
+            href="/quote"
+            className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-3 text-sm font-black text-white md:hidden"
+          >
             Quote
             <ArrowRight size={15} />
           </Link>
@@ -110,25 +138,31 @@ export default function LandingPage() {
       <section className="px-5 pb-16 pt-24 sm:pt-32 lg:px-8 lg:pb-24">
         <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <p className="mb-5 text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+            <p
+              className="mb-5 text-sm font-black uppercase tracking-[0.24em]"
+              style={{ color: dGold }}
+            >
               Serving the GTA &amp; KW area
             </p>
             <h1 className="max-w-3xl text-balance text-5xl font-black leading-[1.05] text-black sm:text-6xl lg:text-7xl">
               Premium exterior care. Zero headaches.
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-black/65 sm:text-lg sm:leading-8">
-              Stop chasing unreliable contractors. Get specialized crews for your windows, gutters, and
-              landscaping who show up on time, communicate clearly, and never ask for upfront payment.
+              Stop chasing unreliable contractors. Get specialized crews for
+              your windows, gutters, and landscaping who show up on time,
+              communicate clearly, and never ask for upfront payment.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link href="/quote"
+              <Link
+                href="/quote"
                 className="inline-flex items-center justify-center gap-2 rounded-lg px-6 py-4 text-base font-black text-black shadow-lg transition hover:bg-black hover:text-white"
                 style={{ backgroundColor: gold }}
               >
                 Get a Quote
                 <ArrowRight size={19} />
               </Link>
-              <a href="tel:289-772-5757"
+              <a
+                href="tel:289-772-5757"
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/20 bg-white px-6 py-4 text-base font-black text-black transition hover:border-black"
               >
                 <Phone size={18} />
@@ -137,7 +171,10 @@ export default function LandingPage() {
             </div>
             <div className="mt-8 flex flex-wrap gap-2">
               {trustChips.map((chip) => (
-                <span key={chip} className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-[#F5F4F0] px-3 py-2 text-sm font-bold text-black/70 shadow-sm">
+                <span
+                  key={chip}
+                  className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-[#F5F4F0] px-3 py-2 text-sm font-bold text-black/70 shadow-sm"
+                >
                   <Check size={14} style={{ color: dGold }} />
                   {chip}
                 </span>
@@ -157,7 +194,10 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
+              <p
+                className="text-sm font-black uppercase tracking-[0.22em]"
+                style={{ color: dGold }}
+              >
                 Industrial equipment, every job.
               </p>
               <p className="mt-2 max-w-3xl text-base font-bold leading-7 text-black">
@@ -166,7 +206,8 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {equipmentChips.map((chip) => (
-                <span key={chip}
+                <span
+                  key={chip}
                   className="inline-flex items-center gap-2 rounded-full border border-black/12 bg-white px-4 py-2 text-sm font-bold text-black/75"
                 >
                   <Zap size={14} style={{ color: dGold }} />
@@ -185,7 +226,11 @@ export default function LandingPage() {
             className="flex flex-col items-start gap-3 rounded-xl border-l-4 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:px-6"
             style={{ borderColor: gold }}
           >
-            <ShieldCheck size={26} style={{ color: dGold }} className="shrink-0" />
+            <ShieldCheck
+              size={26}
+              style={{ color: dGold }}
+              className="shrink-0"
+            />
             <div className="flex-1">
               <p className="text-base font-black text-black">
                 100% satisfaction — we don&apos;t leave until you&apos;re happy.
@@ -202,11 +247,21 @@ export default function LandingPage() {
       <ServicesSection />
 
       {/* ── HOW IT WORKS ── */}
-      <section id="how-it-works" className="scroll-mt-24 bg-[#F5F4F0] px-5 py-20 lg:px-8 lg:py-24">
+      <section
+        id="how-it-works"
+        className="scroll-mt-24 bg-[#F5F4F0] px-5 py-20 lg:px-8 lg:py-24"
+      >
         <div className="mx-auto max-w-7xl">
           <div className="mb-12 max-w-2xl">
-            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>How it works</p>
-            <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">Quote to clean.</h2>
+            <p
+              className="text-sm font-black uppercase tracking-[0.24em]"
+              style={{ color: dGold }}
+            >
+              How it works
+            </p>
+            <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
+              Quote to clean.
+            </h2>
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {processSteps.map((step, index) => (
@@ -220,10 +275,14 @@ export default function LandingPage() {
               >
                 <div className="mb-8 flex items-center justify-between">
                   <step.icon size={26} style={{ color: dGold }} />
-                  <span className="text-4xl font-black text-black/10">0{index + 1}</span>
+                  <span className="text-4xl font-black text-black/10">
+                    0{index + 1}
+                  </span>
                 </div>
                 <h3 className="text-xl font-black text-black">{step.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-black/65">{step.text}</p>
+                <p className="mt-3 text-sm leading-6 text-black/65">
+                  {step.text}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -237,7 +296,10 @@ export default function LandingPage() {
       <section className="px-5 py-20 lg:px-8 lg:py-24">
         <div className="mx-auto max-w-7xl">
           <div className="mb-12 max-w-2xl">
-            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+            <p
+              className="text-sm font-black uppercase tracking-[0.24em]"
+              style={{ color: dGold }}
+            >
               Always in the loop
             </p>
             <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
@@ -256,8 +318,12 @@ export default function LandingPage() {
                   className="rounded-xl border border-black/10 bg-[#F5F4F0] p-6"
                 >
                   <card.Anim />
-                  <h3 className="mt-4 text-xl font-black text-black">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-black/65">{card.text}</p>
+                  <h3 className="mt-4 text-xl font-black text-black">
+                    {card.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-black/65">
+                    {card.text}
+                  </p>
                 </motion.div>
               ))}
             </div>
@@ -267,10 +333,18 @@ export default function LandingPage() {
       </section>
 
       {/* ── WHY DOORWAY ── */}
-      <section id="why-doorway" className="scroll-mt-24 bg-[#111111] px-5 py-20 text-white lg:px-8 lg:py-24">
+      <section
+        id="why-doorway"
+        className="scroll-mt-24 bg-[#111111] px-5 py-20 text-white lg:px-8 lg:py-24"
+      >
         <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: gold }}>Why Doorway</p>
+            <p
+              className="text-sm font-black uppercase tracking-[0.24em]"
+              style={{ color: gold }}
+            >
+              Why Doorway
+            </p>
             <h2 className="mt-3 text-4xl font-black text-white sm:text-5xl">
               One team for the outside jobs.
             </h2>
@@ -280,10 +354,15 @@ export default function LandingPage() {
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             {reassuranceItems.map((item) => (
-              <div key={item.title} className="rounded-xl border border-white/10 bg-white/[0.04] p-6">
+              <div
+                key={item.title}
+                className="rounded-xl border border-white/10 bg-white/[0.04] p-6"
+              >
                 <item.icon size={26} style={{ color: gold }} />
                 <h3 className="mt-5 text-xl font-black">{item.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-white/60">{item.text}</p>
+                <p className="mt-3 text-sm leading-6 text-white/60">
+                  {item.text}
+                </p>
               </div>
             ))}
           </div>
@@ -299,14 +378,18 @@ export default function LandingPage() {
           >
             <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
+                <p
+                  className="text-sm font-black uppercase tracking-[0.22em]"
+                  style={{ color: dGold }}
+                >
                   Neighbour routing
                 </p>
                 <h2 className="mt-3 text-3xl font-black text-black">
                   Working on your street? Let us know.
                 </h2>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-black/65">
-                  Neighbours booking around the same time? Mention it in the quote — we route together and discount accordingly.
+                  Neighbours booking around the same time? Mention it in the
+                  quote — we route together and discount accordingly.
                 </p>
               </div>
               <Link
@@ -326,7 +409,10 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+              <p
+                className="text-sm font-black uppercase tracking-[0.24em]"
+                style={{ color: dGold }}
+              >
                 Return clients
               </p>
               <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
@@ -345,10 +431,17 @@ export default function LandingPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               {returnPerks.map((perk) => (
-                <div key={perk.title} className="rounded-xl border border-black/10 bg-white p-5">
-                  <p className="text-lg font-black" style={{ color: gold }}>{perk.value}</p>
+                <div
+                  key={perk.title}
+                  className="rounded-xl border border-black/10 bg-white p-5"
+                >
+                  <p className="text-lg font-black" style={{ color: gold }}>
+                    {perk.value}
+                  </p>
                   <h3 className="mt-1 font-black text-black">{perk.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-black/60">{perk.text}</p>
+                  <p className="mt-2 text-sm leading-6 text-black/60">
+                    {perk.text}
+                  </p>
                 </div>
               ))}
             </div>
@@ -360,14 +453,18 @@ export default function LandingPage() {
       <section className="px-5 py-20 lg:px-8 lg:py-24">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+            <p
+              className="text-sm font-black uppercase tracking-[0.24em]"
+              style={{ color: dGold }}
+            >
               Custom requests
             </p>
             <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
               Something else on the outside of your home?
             </h2>
             <p className="mt-5 max-w-3xl text-base leading-7 text-black/60">
-              If it&apos;s on the outside of your home, send it. We&apos;ll tell you straight what we can do.
+              If it&apos;s on the outside of your home, send it. We&apos;ll tell
+              you straight what we can do.
             </p>
           </div>
           <Link
@@ -388,13 +485,21 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>FAQ</p>
+              <p
+                className="text-sm font-black uppercase tracking-[0.24em]"
+                style={{ color: dGold }}
+              >
+                FAQ
+              </p>
               <h2 className="mt-3 text-4xl font-black text-black sm:text-5xl">
                 Common questions.
               </h2>
               <p className="mt-5 text-base leading-7 text-black/60">
                 Still not sure? Call or text us at{" "}
-                <a href="tel:289-772-5757" className="font-bold text-black hover:underline">
+                <a
+                  href="tel:289-772-5757"
+                  className="font-bold text-black hover:underline"
+                >
                   289-772-5757
                 </a>{" "}
                 and we&apos;ll answer directly.
@@ -410,13 +515,19 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl rounded-xl border border-black/10 bg-[#F5F4F0] p-6 lg:p-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: dGold }}>
+              <p
+                className="text-sm font-black uppercase tracking-[0.22em]"
+                style={{ color: dGold }}
+              >
                 Contractors
               </p>
-              <h2 className="mt-2 text-2xl font-black text-black">Join the Doorway Detail team.</h2>
+              <h2 className="mt-2 text-2xl font-black text-black">
+                Join the Doorway Detail team.
+              </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-black/60">
-                We work with reliable contractors as the company grows. If you care about clean work,
-                communication, and showing up prepared, reach out.
+                We work with reliable contractors as the company grows. If you
+                care about clean work, communication, and showing up prepared,
+                reach out.
               </p>
             </div>
             <a
@@ -437,8 +548,9 @@ export default function LandingPage() {
             <div>
               <BrandMark variant="dark" className="text-white" />
               <p className="mt-4 max-w-xl text-sm leading-6 text-white/50">
-                Professional exterior cleaning with a quote-first booking process. Windows, gutters,
-                pressure washing, and landscaping — across the GTA and KW area.
+                Professional exterior cleaning with a quote-first booking
+                process. Windows, gutters, pressure washing, and landscaping —
+                across the GTA and KW area.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -460,11 +572,20 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="mt-10 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-white/40 md:flex-row md:items-center md:justify-between">
-            <p>&copy; {new Date().getFullYear()} Doorway Detail. All rights reserved.</p>
+            <p>
+              &copy; {new Date().getFullYear()} Doorway Detail. All rights
+              reserved.
+            </p>
             <div className="flex gap-6">
-              <Link href="/privacy" className="transition hover:text-white">Privacy Policy</Link>
-              <Link href="/terms" className="transition hover:text-white">Terms of Service</Link>
-              <Link href="/login" className="transition hover:text-white">Staff Login</Link>
+              <Link href="/privacy" className="transition hover:text-white">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="transition hover:text-white">
+                Terms of Service
+              </Link>
+              <Link href="/login" className="transition hover:text-white">
+                Staff Login
+              </Link>
             </div>
           </div>
         </div>
@@ -472,22 +593,31 @@ export default function LandingPage() {
 
       {/* ── MOBILE STICKY CTA ── */}
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-black/10 bg-white/95 p-3 shadow-lg backdrop-blur md:hidden">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href="/quote"
+              className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-black text-black"
+              style={{ backgroundColor: gold }}
+            >
+              Get Quote
+              <ArrowRight size={16} />
+            </Link>
+            <a
+              href="tel:289-772-5757"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#111111] px-4 py-3 text-sm font-black text-white"
+            >
+              <Phone size={16} />
+              Call
+            </a>
+          </div>
           <Link
-            href="/quote"
-            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-black text-black"
-            style={{ backgroundColor: gold }}
+            href="/login"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-black/15 px-4 py-3.5 text-base font-black text-black"
           >
-            Get Quote
-            <ArrowRight size={16} />
+            <Lock size={18} />
+            Staff Login
           </Link>
-          <a
-            href="tel:289-772-5757"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#111111] px-4 py-3 text-sm font-black text-white"
-          >
-            <Phone size={16} />
-            Call
-          </a>
         </div>
       </div>
     </main>
