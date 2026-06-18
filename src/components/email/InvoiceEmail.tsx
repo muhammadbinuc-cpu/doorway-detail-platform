@@ -32,6 +32,7 @@ interface InvoiceEmailProps {
   taxAmount: number;
   total: number;
   dueDate: string;
+  invoiceNotes?: string;
   business: InvoiceEmailBusiness;
 }
 
@@ -48,6 +49,7 @@ export const InvoiceEmail = ({
   taxAmount,
   total,
   dueDate,
+  invoiceNotes,
   business,
 }: InvoiceEmailProps) => {
   return (
@@ -71,7 +73,9 @@ export const InvoiceEmail = ({
               <Row>
                 <Column>
                   <Text style={label}>BILLED TO</Text>
-                  <Heading as="h3" style={clientNameHeading}>{clientName}</Heading>
+                  <Heading as="h3" style={clientNameHeading}>
+                    {clientName}
+                  </Heading>
                 </Column>
                 <Column style={{ textAlign: "right" }}>
                   <Text style={label}>INVOICE</Text>
@@ -92,7 +96,9 @@ export const InvoiceEmail = ({
                     </Text>
                   </Column>
                   <Column style={{ textAlign: "right" }}>
-                    <Text style={itemPrice}>{money(item.quantity * item.unitPrice)}</Text>
+                    <Text style={itemPrice}>
+                      {money(item.quantity * item.unitPrice)}
+                    </Text>
                   </Column>
                 </Row>
               ))}
@@ -100,25 +106,41 @@ export const InvoiceEmail = ({
               <Hr style={hr} />
 
               <Row style={{ marginBottom: "6px" }}>
-                <Column><Text style={smallLabel}>Subtotal</Text></Column>
-                <Column style={{ textAlign: "right" }}><Text style={smallValue}>{money(subtotal)}</Text></Column>
+                <Column>
+                  <Text style={smallLabel}>Subtotal</Text>
+                </Column>
+                <Column style={{ textAlign: "right" }}>
+                  <Text style={smallValue}>{money(subtotal)}</Text>
+                </Column>
               </Row>
               {discount > 0 && (
                 <Row style={{ marginBottom: "6px" }}>
-                  <Column><Text style={smallLabelGreen}>Discount</Text></Column>
-                  <Column style={{ textAlign: "right" }}><Text style={smallValueGreen}>-{money(discount)}</Text></Column>
+                  <Column>
+                    <Text style={smallLabelGreen}>Discount</Text>
+                  </Column>
+                  <Column style={{ textAlign: "right" }}>
+                    <Text style={smallValueGreen}>-{money(discount)}</Text>
+                  </Column>
                 </Row>
               )}
               <Row style={{ marginBottom: "6px" }}>
-                <Column><Text style={smallLabel}>Tax ({taxRate}%)</Text></Column>
-                <Column style={{ textAlign: "right" }}><Text style={smallValue}>{money(taxAmount)}</Text></Column>
+                <Column>
+                  <Text style={smallLabel}>Tax ({taxRate}%)</Text>
+                </Column>
+                <Column style={{ textAlign: "right" }}>
+                  <Text style={smallValue}>{money(taxAmount)}</Text>
+                </Column>
               </Row>
 
               <Hr style={hr} />
 
               <Row style={{ paddingTop: "4px" }}>
-                <Column><Text style={totalLabel}>Total Due</Text></Column>
-                <Column style={{ textAlign: "right" }}><Text style={totalPrice}>{money(total)}</Text></Column>
+                <Column>
+                  <Text style={totalLabel}>Total Due</Text>
+                </Column>
+                <Column style={{ textAlign: "right" }}>
+                  <Text style={totalPrice}>{money(total)}</Text>
+                </Column>
               </Row>
             </Section>
 
@@ -127,10 +149,19 @@ export const InvoiceEmail = ({
               Pay {money(total)}
             </Button>
 
+            {/* --- NOTES --- */}
+            {invoiceNotes ? (
+              <Section style={notesBox}>
+                <Text style={label}>NOTES</Text>
+                <Text style={notesText}>{invoiceNotes}</Text>
+              </Section>
+            ) : null}
+
             {/* --- FOOTER --- */}
             <Text style={footer}>
               {business.name}
-              {business.hstNumber ? ` · HST# ${business.hstNumber}` : ""} · {business.phone}
+              {business.hstNumber ? ` · HST# ${business.hstNumber}` : ""} ·{" "}
+              {business.phone}
             </Text>
             <Text style={footerSub}>SECURE PAYMENT PROCESSING</Text>
           </Section>
@@ -143,7 +174,8 @@ export const InvoiceEmail = ({
 export default InvoiceEmail;
 
 // --- STYLES ---
-const fontFamily = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol"';
+const fontFamily =
+  '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol"';
 
 const main = {
   backgroundColor: "#f9fafb",
@@ -206,7 +238,8 @@ const clientNameHeading = {
 
 const invoiceIdText = {
   fontSize: "16px",
-  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  fontFamily:
+    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
   fontWeight: "700",
   color: "#000000",
   margin: "0",
@@ -288,6 +321,21 @@ const button = {
   display: "block",
   width: "100%",
   padding: "20px 0",
+};
+
+const notesBox = {
+  backgroundColor: "#f9fafb",
+  borderRadius: "12px",
+  padding: "16px 20px",
+  margin: "20px 0 0",
+  border: "1px solid #e5e7eb",
+};
+
+const notesText = {
+  fontSize: "13px",
+  color: "#374151",
+  margin: "4px 0 0",
+  whiteSpace: "pre-wrap" as const,
 };
 
 const footer = {

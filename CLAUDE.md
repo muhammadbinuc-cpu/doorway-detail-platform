@@ -15,23 +15,23 @@
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 16.1 (App Router) |
-| UI | React 19.2 + Tailwind CSS 4 |
-| Language | TypeScript 5 |
-| Database | Firebase Firestore |
-| Auth | Firebase Auth (session cookies) |
-| Payments | Stripe Checkout |
-| Email | Resend + React Email |
-| SMS | Twilio |
-| Calendar | Google Calendar API |
-| Charts | Recharts |
-| Validation | Zod 4 |
-| Animations | Framer Motion |
-| Icons | Lucide React |
-| Audit Logs | Supabase (optional) |
-| Testing | Jest + ts-jest |
+| Layer      | Technology                                      |
+| ---------- | ----------------------------------------------- |
+| Framework  | Next.js 16.1 (App Router)                       |
+| UI         | React 19.2 + Tailwind CSS 4                     |
+| Language   | TypeScript 5                                    |
+| Database   | Firebase Firestore                              |
+| Auth       | Firebase Auth (session cookies)                 |
+| Payments   | Stripe Checkout                                 |
+| Email      | Gmail SMTP (Nodemailer) + React Email templates |
+| SMS        | Twilio                                          |
+| Calendar   | Google Calendar API                             |
+| Charts     | Recharts                                        |
+| Validation | Zod 4                                           |
+| Animations | Framer Motion                                   |
+| Icons      | Lucide React                                    |
+| Audit Logs | Supabase (optional)                             |
+| Testing    | Jest + ts-jest                                  |
 
 ---
 
@@ -116,6 +116,7 @@ __tests__/
 ```
 
 ### Landing page section order (page.tsx)
+
 1. Nav — Services · How It Works · Why Doorway (3 links only, no Join the Team)
 2. Hero — headline + CTA + trust chips + WorkerTeamFull illustration
 3. Equipment credibility strip — commercial-grade equipment chips
@@ -153,6 +154,7 @@ CANCELLED     → SCHEDULED  (reschedule)
 ## Security Architecture
 
 ### Auth Flow
+
 1. Login at `/login` via Firebase Auth (email/password)
 2. Client sends ID token → `verifyFirebaseLogin` server action
 3. Server sets `__session` cookie (httpOnly, 5-day expiry)
@@ -160,11 +162,13 @@ CANCELLED     → SCHEDULED  (reschedule)
 5. `admin/layout.tsx` re-verifies server-side as double check
 
 ### Data Access
+
 - **Public**: GET jobs where status is `INVOICED`, `UNPAID`, or `PAID` only (UNPAID included so overdue customers — flagged by the reminder cron — can still load and pay their invoice; see `firestore.rules`)
 - **Writes**: Server Actions via Firebase Admin SDK (bypasses Firestore rules)
 - **Admin reads**: Client SDK with `onSnapshot` (Firestore rules enforce auth)
 
 ### Security modules
+
 - `errors.ts` — never leaks internals; maps to user-safe messages
 - `validation.ts` — strips HTML, validates all inputs at boundary
 - `rate-limit.ts` — IP-based (in-memory, resets on cold start — known tradeoff)
@@ -176,24 +180,27 @@ CANCELLED     → SCHEDULED  (reschedule)
 ## Coding Conventions
 
 ### Server Actions (actions.ts)
+
 - Every admin action MUST start with `await requireAdmin()`
 - Every doc ID MUST be run through `validateId()` before use
 - Error pattern:
   ```typescript
   try {
-      await requireAdmin();
-      validateId(id);
-      // business logic
+    await requireAdmin();
+    validateId(id);
+    // business logic
   } catch (error) {
-      return handleServerActionError(error, 'actionName');
+    return handleServerActionError(error, "actionName");
   }
   ```
 
 ### Firebase
+
 - Client SDK (`@/lib/firebase`) — client components only
 - Admin SDK (`@/lib/firebase-admin`) — server actions only. Never import in client components.
 
 ### Styling
+
 - Tailwind CSS 4 — utility classes only
 - **Color system (three surfaces only — do not add new backgrounds):**
   - Page base: `#FFFFFF` white — `<main>`, hero, nav
@@ -206,16 +213,19 @@ CANCELLED     → SCHEDULED  (reschedule)
 - Animations: Framer Motion
 
 ### Key sanitization
+
 - Use `sanitizeKey()` from `@/lib/key-utils` for any private key/secret env var
 - Do NOT inline `key.replace(/['"]/g, "").replace(/\\n/g, "\n")` — it already exists
 
 ### Invoices (single source of truth)
+
 - **Never recompute invoice totals inline.** Use `computeInvoiceTotals(job)` from `@/lib/invoice` — used by the web invoice, the email, Stripe checkout, and the admin views. It normalizes `lineItems` (falls back to `service`+`price`), applies discount then tax, rounds to cents.
 - `InvoiceEmail` props: `{ clientName, invoiceNumber, invoiceUrl, lineItems, subtotal, discount, taxRate, taxAmount, total, dueDate, business }`.
 - Sequential numbers via `assignInvoiceNumber(jobRef)` in `actions.ts` — a Firestore transaction on `counters/invoices`. **Idempotent**: re-sending an invoiced job does NOT bump the number. Assigned on first `→ INVOICED` (both `emailInvoice` and a manual `updateJobStatus`).
 - Business identity (name, address, phone, HST#) lives in `@/lib/business` `BUSINESS`.
 
 ### Getting paid + auto-chase
+
 - **Manual payment** (e-transfer/cash): `markInvoicePaid(jobId, method)` action. Stripe payments flow through the webhook (`paymentMethod:'card'`).
 - **Receipt email**: both payment paths call `sendPaymentReceipt(jobId)` from `src/lib/server/payment-receipt.ts` (server-only, non-blocking) → emails a paid-in-full receipt via `PaymentReceiptEmail`.
 - **Overdue / reminders**: predicates `isOverdue(job, now)` and `isReminderDue(job, now)` in `@/lib/invoice` (gentle policy: remind once overdue, then every 3 days, max 3). **Unit-tested — change the policy there, not inline.**
@@ -233,7 +243,7 @@ CANCELLED     → SCHEDULED  (reschedule)
 5. **Toasts + confirms** — admin uses `sonner` (`<Toaster>` in root `layout.tsx`). Success/error → `toast.success/error`. Destructive confirms → `useConfirm()` from `@/components/ui/ConfirmDialog` (provider in `admin/layout.tsx`). **Don't reintroduce `alert()`/`confirm()`.**
 6. **Testimonials are placeholder** — `Testimonials` in `src/app/landing-conversion.tsx` renders a "coming soon" prompt while its `testimonials` array is empty. ⚠️ Fill with REAL reviews only — fake reviews violate Canada's Competition Act.
 7. **Before/after gallery** — `BeforeAfterGallery` in `src/app/landing-conversion.tsx`. Fill each item's `before`/`after` image paths (in `/public`) to switch a tile from "photo coming soon" to an interactive drag-slider.
-8. **`submitQuote` sends an instant customer confirmation** (email via `QuoteConfirmationEmail` + SMS) through `sendQuoteConfirmation()`. It's **non-blocking** — a missing Resend/Twilio key or send failure is caught and logged, never failing lead capture. Keep it that way.
+8. **`submitQuote` sends an instant customer confirmation** (email via `QuoteConfirmationEmail` + SMS) through `sendQuoteConfirmation()`. It's **non-blocking** — a missing Gmail/Twilio key or send failure is caught and logged, never failing lead capture. Keep it that way. (Email transport is `sendMail()` in `src/lib/server/mailer.ts` — Gmail SMTP; it renders the React Email template to HTML and returns `{ok,error}`. `emailInvoice` surfaces a `deliveryWarning` to the admin on failure instead of a false success, and attaches a PDF copy of the invoice via `src/lib/server/invoice-pdf.tsx`.)
 9. **Hover states in page.tsx use inline `onMouseEnter/Leave`** — because Tailwind 4 doesn't support arbitrary `hover:bg-[#hex]` with dynamic values. If refactoring, consider extracting button variants.
 
 ---
@@ -241,6 +251,7 @@ CANCELLED     → SCHEDULED  (reschedule)
 ## Environment Variables
 
 ### Required
+
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
@@ -256,8 +267,11 @@ NEXT_PUBLIC_BASE_URL
 ```
 
 ### Optional (features degrade gracefully without these)
+
 ```
-RESEND_API_KEY              # Email invoices
+GMAIL_USER                  # Active email sender — the Doorway Detail Gmail (doorwaydetail@gmail.com)
+GMAIL_APP_PASSWORD          # Google App Password (NOT the account password; requires 2FA). Used by src/lib/server/mailer.ts (Gmail SMTP via Nodemailer)
+RESEND_API_KEY              # Legacy — Resend is no longer wired up (kept for reference)
 TWILIO_ACCOUNT_SID          # SMS notifications
 TWILIO_AUTH_TOKEN
 TWILIO_FROM_NUMBER
@@ -274,6 +288,7 @@ CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in V
 ## Firestore Schema
 
 ### `jobs`
+
 ```typescript
 {
   clientId: string;
@@ -305,6 +320,7 @@ CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in V
 ```
 
 ### `clients`
+
 ```typescript
 {
   name: string;
@@ -323,18 +339,18 @@ CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in V
 
 ## Routes
 
-| Route | Auth | Description |
-|-------|------|-------------|
-| `/` | Public | Landing page |
-| `/quote` | Public | Quote submission |
-| `/login` | Public | Admin login |
-| `/admin` | Protected | Job dashboard |
-| `/admin/invoices` | Protected | Invoices list (INVOICED/UNPAID/PAID) |
-| `/admin/schedule` | Protected | Month calendar of scheduled jobs |
-| `/admin/clients` | Protected | Client list |
-| `/admin/clients/[id]` | Protected | Client detail |
-| `/invoice/[id]` | Semi-public | Invoice (INVOICED/PAID only) |
-| `/api/webhooks/stripe` | Stripe | Payment confirmation |
+| Route                         | Auth        | Description                          |
+| ----------------------------- | ----------- | ------------------------------------ |
+| `/`                           | Public      | Landing page                         |
+| `/quote`                      | Public      | Quote submission                     |
+| `/login`                      | Public      | Admin login                          |
+| `/admin`                      | Protected   | Job dashboard                        |
+| `/admin/invoices`             | Protected   | Invoices list (INVOICED/UNPAID/PAID) |
+| `/admin/schedule`             | Protected   | Month calendar of scheduled jobs     |
+| `/admin/clients`              | Protected   | Client list                          |
+| `/admin/clients/[id]`         | Protected   | Client detail                        |
+| `/invoice/[id]`               | Semi-public | Invoice (INVOICED/PAID only)         |
+| `/api/webhooks/stripe`        | Stripe      | Payment confirmation                 |
 | `/api/cron/invoice-reminders` | CRON_SECRET | Daily auto-chase of overdue invoices |
 
 ---
@@ -356,6 +372,7 @@ Tests live in `__tests__/`. Current coverage: `fsm.test.ts` (10 cases, full work
 Push to `main` → Vercel auto-deploys.
 
 Pre-deploy checklist:
+
 - `npm run build` clean
 - `npm run test` passing
 - All required env vars in Vercel dashboard
