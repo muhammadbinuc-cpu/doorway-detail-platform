@@ -20,6 +20,9 @@ import {
   CheckCircle2,
   Download,
   Ban,
+  Plus,
+  Search,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,6 +30,7 @@ import {
   sendInvoiceReminder,
   markInvoicePaid,
   voidInvoice,
+  createInvoiceForClient,
 } from "@/app/actions";
 import {
   computeInvoiceTotals,
@@ -37,6 +41,10 @@ import {
 import { formatInvoiceNumber } from "@/lib/business";
 import { statusMeta } from "@/lib/job-status";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import {
+  LineItemsEditor,
+  type CatalogService,
+} from "@/components/admin/LineItemsEditor";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface InvoiceJob {
@@ -52,6 +60,14 @@ interface InvoiceJob {
   invoicedAt?: { seconds?: number };
   paymentMethod?: string;
   reminderCount?: number;
+}
+
+interface ClientOption {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
 }
 
 const INVOICE_STATUSES = new Set(["INVOICED", "UNPAID", "PAID"]);
@@ -81,6 +97,8 @@ const overdueOf = (job: InvoiceJob) =>
 
 export default function InvoicesPage() {
   const [jobs, setJobs] = useState<InvoiceJob[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
+  const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -88,11 +106,23 @@ export default function InvoicesPage() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [methodPickerId, setMethodPickerId] = useState<string | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [createLineItems, setCreateLineItems] = useState<LineItem[]>([]);
+  const [createForm, setCreateForm] = useState({
+    discount: 0,
+    taxRate: 0,
+    invoiceNotes: "",
+  });
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
   const router = useRouter();
   const confirm = useConfirm();
 
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
+    let unsubscribeClients: (() => void) | null = null;
+    let unsubscribeServices: (() => void) | null = null;
     const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
       if (u) {
         setUser(u);
@@ -114,19 +144,74 @@ export default function InvoicesPage() {
               console.error("Firestore Error:", error);
           },
         );
+        const clientsQuery = query(collection(db, "clients"), orderBy("name"));
+        unsubscribeClients = onSnapshot(
+          clientsQuery,
+          (snap) => {
+            setClients(
+              snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ClientOption),
+            );
+          },
+          (error) => {
+            if (error.code !== "permission-denied")
+              console.error("Firestore Clients Error:", error);
+          },
+        );
+        const servicesQuery = query(collection(db, "services"), orderBy("name"));
+        unsubscribeServices = onSnapshot(
+          servicesQuery,
+          (snap) => {
+            setCatalogServices(
+              snap.docs.map(
+                (d) => ({ id: d.id, ...d.data() }) as CatalogService,
+              ),
+            );
+          },
+          (error) => {
+            if (error.code !== "permission-denied")
+              console.error("Firestore Services Error:", error);
+          },
+        );
       } else {
         if (unsubscribeSnapshot) unsubscribeSnapshot();
+        if (unsubscribeClients) unsubscribeClients();
+        if (unsubscribeServices) unsubscribeServices();
         router.push("/login");
       }
     });
     return () => {
       if (unsubscribeSnapshot) unsubscribeSnapshot();
+      if (unsubscribeClients) unsubscribeClients();
+      if (unsubscribeServices) unsubscribeServices();
       unsubscribeAuth();
     };
   }, [router]);
 
   const invoices = jobs.filter((j) => INVOICE_STATUSES.has(j.status));
   const totalsFor = (j: InvoiceJob) => computeInvoiceTotals(j).total;
+  const selectedClient =
+    clients.find((client) => client.id === selectedClientId) || null;
+  const filteredClients = clients.filter((client) => {
+    const q = clientSearch.toLowerCase();
+    return (
+      String(client.name || "").toLowerCase().includes(q) ||
+      String(client.email || "").toLowerCase().includes(q) ||
+      String(client.address || "").toLowerCase().includes(q)
+    );
+  });
+  const cleanCreateLineItems = () =>
+    createLineItems
+      .filter((li) => li.description.trim() && li.quantity > 0)
+      .map((li) => ({
+        description: li.description.trim(),
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+      }));
+  const createPreview = computeInvoiceTotals({
+    lineItems: cleanCreateLineItems(),
+    discount: createForm.discount,
+    taxRate: createForm.taxRate,
+  });
 
   const outstanding = invoices.filter(
     (j) => j.status === "INVOICED" || j.status === "UNPAID",
@@ -203,6 +288,64 @@ export default function InvoicesPage() {
     else toast.error(errText(res));
   };
 
+  const resetCreateInvoice = () => {
+    setSelectedClientId("");
+    setClientSearch("");
+    setCreateLineItems([]);
+    setCreateForm({ discount: 0, taxRate: 0, invoiceNotes: "" });
+  };
+
+  const handleCreateInvoice = async (sendAfterSave: boolean) => {
+    const lineItems = cleanCreateLineItems();
+    if (!selectedClientId) {
+      toast.error("Select a client");
+      return;
+    }
+    if (lineItems.length === 0) {
+      toast.error("Add at least one line item");
+      return;
+    }
+    if (
+      sendAfterSave &&
+      !(await confirm({
+        message: `Create and email this invoice to ${selectedClient?.name || "the client"}?`,
+        confirmText: "Save & Send",
+      }))
+    )
+      return;
+
+    setCreatingInvoice(true);
+    const res = await createInvoiceForClient(selectedClientId, {
+      lineItems,
+      discount: createForm.discount,
+      taxRate: createForm.taxRate,
+      invoiceNotes: createForm.invoiceNotes,
+    });
+
+    if (!res.success || !("jobId" in res)) {
+      setCreatingInvoice(false);
+      toast.error(errText(res));
+      return;
+    }
+
+    if (sendAfterSave) {
+      const sendRes = await emailInvoice(res.jobId);
+      if (!sendRes.success)
+        toast.error(`Invoice saved, but email failed: ${errText(sendRes)}`);
+      else {
+        const warn = warnText(sendRes);
+        if (warn) toast.warning(warn);
+        else toast.success("Invoice created and sent");
+      }
+    } else {
+      toast.success("Invoice created");
+    }
+
+    setCreatingInvoice(false);
+    setIsCreateModalOpen(false);
+    resetCreateInvoice();
+  };
+
   if (loading)
     return (
       <div className="h-screen flex items-center justify-center">
@@ -217,11 +360,19 @@ export default function InvoicesPage() {
 
       <main className="flex-1 p-6 md:p-10 overflow-auto">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-black">Invoices</h1>
-            <p className="text-gray-500 mt-1">
-              Every invoiced, unpaid, and paid job in one place.
-            </p>
+          <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
+            <div>
+              <h1 className="text-3xl font-black">Invoices</h1>
+              <p className="text-gray-500 mt-1">
+                Every invoiced, unpaid, and paid job in one place.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="bg-black text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-[#D4AF37] hover:text-black transition-all"
+            >
+              <Plus size={18} /> Create Invoice
+            </button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -461,6 +612,252 @@ export default function InvoicesPage() {
           </div>
         </div>
       </main>
+
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-5xl w-full shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black">Create Invoice</h2>
+              <button
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  resetCreateInvoice();
+                }}
+                disabled={creatingInvoice}
+                className="text-gray-400 hover:text-black disabled:opacity-50"
+                aria-label="Close create invoice modal"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-[1.15fr_0.85fr] gap-8 max-h-[76vh] overflow-auto">
+              <div className="space-y-5 pr-1">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                    Client
+                  </label>
+                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 mb-3 flex items-center gap-2">
+                    <Search className="text-gray-400" size={18} />
+                    <input
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      placeholder="Search clients..."
+                      className="bg-transparent outline-none flex-1 font-bold text-sm"
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-auto rounded-xl border border-gray-100">
+                    {filteredClients.length === 0 && (
+                      <p className="p-4 text-sm text-gray-400 italic">
+                        No clients found.
+                      </p>
+                    )}
+                    {filteredClients.map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => setSelectedClientId(client.id)}
+                        className={`w-full text-left p-4 border-b last:border-0 transition-colors ${
+                          selectedClientId === client.id
+                            ? "bg-[#D4AF37] text-black"
+                            : "bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className="block font-bold">{client.name}</span>
+                        <span className="block text-xs opacity-70 mt-1">
+                          {client.address}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <LineItemsEditor
+                  lineItems={createLineItems}
+                  onChange={setCreateLineItems}
+                  catalogServices={catalogServices}
+                  emptyMessage="Add at least one line item before saving."
+                />
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                      Discount Amount ($)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={createForm.discount}
+                      onChange={(e) =>
+                        setCreateForm({
+                          ...createForm,
+                          discount: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                      Tax Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={createForm.taxRate}
+                      onChange={(e) =>
+                        setCreateForm({
+                          ...createForm,
+                          taxRate: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                    Invoice Notes
+                  </label>
+                  <textarea
+                    value={createForm.invoiceNotes}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        invoiceNotes: e.target.value,
+                      })
+                    }
+                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] resize-none h-24"
+                    placeholder="Thank you for your business..."
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => handleCreateInvoice(false)}
+                    disabled={creatingInvoice}
+                    className="flex-1 bg-gray-100 text-black p-4 rounded-xl font-bold hover:bg-gray-200 transition-all disabled:opacity-50"
+                  >
+                    {creatingInvoice ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="animate-spin" size={16} /> Saving
+                      </span>
+                    ) : (
+                      "Save"
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleCreateInvoice(true)}
+                    disabled={creatingInvoice}
+                    className="flex-1 bg-black text-white p-4 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-all disabled:opacity-50"
+                  >
+                    {creatingInvoice ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="animate-spin" size={16} /> Saving
+                      </span>
+                    ) : (
+                      "Save & Send"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase mb-2">
+                  Preview
+                </p>
+                <div className="rounded-2xl border border-gray-200 overflow-hidden text-black">
+                  <div className="bg-black p-5 text-center">
+                    <p className="text-white font-black italic tracking-wider">
+                      DOORWAY <span className="text-[#D4AF37]">DETAIL</span>
+                    </p>
+                    <p className="text-gray-400 text-[10px] font-bold tracking-widest uppercase mt-1">
+                      Official Invoice
+                    </p>
+                  </div>
+                  <div className="p-5 text-sm">
+                    <div className="flex justify-between gap-4 mb-4">
+                      <div>
+                        <p className="text-gray-400 text-[10px] font-bold uppercase">
+                          Billed To
+                        </p>
+                        <p className="font-bold">
+                          {selectedClient?.name || "Select a client"}
+                        </p>
+                        <p className="text-gray-500 text-xs">
+                          {selectedClient?.address || "-"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-gray-400 text-[10px] font-bold uppercase">
+                          Total
+                        </p>
+                        <p className="font-black text-[#D4AF37]">
+                          ${createPreview.total.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      {createPreview.lineItems.map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex justify-between gap-3 mb-2 last:mb-0"
+                        >
+                          <span className="font-bold">
+                            {item.description}
+                            {item.quantity > 1 && (
+                              <span className="text-gray-400 font-semibold">
+                                {" "}
+                                x {item.quantity}
+                              </span>
+                            )}
+                          </span>
+                          <span className="font-bold whitespace-nowrap">
+                            ${(item.quantity * item.unitPrice).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="border-t border-gray-200 mt-3 pt-3 space-y-1 text-xs">
+                        <div className="flex justify-between text-gray-500">
+                          <span>Subtotal</span>
+                          <span>${createPreview.subtotal.toFixed(2)}</span>
+                        </div>
+                        {createPreview.discount > 0 && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Discount</span>
+                            <span>-${createPreview.discount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-gray-500">
+                          <span>Tax ({createPreview.taxRate}%)</span>
+                          <span>${createPreview.taxAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between font-black pt-3 mt-3 border-t border-gray-200">
+                        <span>Total Due</span>
+                        <span className="text-[#D4AF37]">
+                          ${createPreview.total.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                    {createForm.invoiceNotes.trim() && (
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mt-3">
+                        <p className="text-gray-400 text-[10px] font-bold uppercase mb-1">
+                          Notes
+                        </p>
+                        <p className="text-gray-600 text-xs whitespace-pre-wrap">
+                          {createForm.invoiceNotes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

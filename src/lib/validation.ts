@@ -50,7 +50,7 @@ const percentageSchema = z.number()
     .transform((val) => Math.round(val * 100) / 100);
 
 // 🔒 Line item validation (one row of an invoice)
-const lineItemSchema = z.object({
+export const LineItemSchema = z.object({
     description: sanitizedString(1, 200),
     quantity: z.number()
         .min(1, 'Quantity must be at least 1')
@@ -119,7 +119,7 @@ export const JobUpdateSchema = z.object({
     discount: priceSchema.optional(),
     taxRate: percentageSchema.optional(),  // ✅ Now allows 0
     invoiceNotes: notesSchema,
-    lineItems: z.array(lineItemSchema).max(50, 'Too many line items').optional(),
+    lineItems: z.array(LineItemSchema).max(50, 'Too many line items').optional(),
 }).refine(
     (data) => Object.keys(data).length > 0,
     { message: 'At least one field must be provided' }
@@ -134,6 +134,29 @@ export const ClientSchema = z.object({
     phone: phoneSchema,
     address: addressSchema,
     propertyNotes: notesSchema
+});
+
+/**
+ * 🔒 Service catalog item schema
+ */
+export const ServiceSchema = z.object({
+    name: sanitizedString(1, 100).refine((val) => val.length > 0, {
+        message: 'This field is required'
+    }),
+    description: notesSchema,
+    unitPrice: priceSchema
+});
+
+/**
+ * 🔒 Quick invoice creation schema
+ */
+export const InvoiceCreateSchema = z.object({
+    lineItems: z.array(LineItemSchema)
+        .min(1, 'At least one line item is required')
+        .max(50, 'Too many line items'),
+    discount: priceSchema.optional(),
+    taxRate: percentageSchema.optional(),
+    invoiceNotes: notesSchema
 });
 
 /**
@@ -171,6 +194,8 @@ export const IdSchema = z.object({
 export type QuoteInput = z.infer<typeof QuoteSchema>;
 export type JobUpdateInput = z.infer<typeof JobUpdateSchema>;
 export type ClientInput = z.infer<typeof ClientSchema>;
+export type ServiceInput = z.infer<typeof ServiceSchema>;
+export type InvoiceCreateInput = z.infer<typeof InvoiceCreateSchema>;
 export type JobStatusInput = z.infer<typeof JobStatusSchema>;
 export type BookingInput = z.infer<typeof BookingSchema>;
 
@@ -188,6 +213,14 @@ export function validateJobUpdate(data: unknown): JobUpdateInput {
 
 export function validateClient(data: unknown): ClientInput {
     return ClientSchema.parse(data);
+}
+
+export function validateService(data: unknown): ServiceInput {
+    return ServiceSchema.parse(data);
+}
+
+export function validateInvoiceCreate(data: unknown): InvoiceCreateInput {
+    return InvoiceCreateSchema.parse(data);
 }
 
 export function validateJobStatus(jobId: string, newStatus: string): JobStatusInput {

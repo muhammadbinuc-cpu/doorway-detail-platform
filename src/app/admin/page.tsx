@@ -48,6 +48,10 @@ import { statusLabel } from "@/lib/job-status";
 import { formatInvoiceNumber, BUSINESS } from "@/lib/business";
 import { computeInvoiceTotals, getDueDate, type LineItem } from "@/lib/invoice";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import {
+  LineItemsEditor,
+  type CatalogService,
+} from "@/components/admin/LineItemsEditor";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface Job {
@@ -79,21 +83,16 @@ const getNextStatuses = (currentStatus: string): string[] => {
   return [currentStatus, ...allowed];
 };
 
-const emptyLineItem = (): LineItem => ({
-  description: "",
-  quantity: 1,
-  unitPrice: 0,
-});
-
 export default function AdminPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [editForm, setEditForm] = useState({
     discount: 0,
-    taxRate: 13,
+    taxRate: 0,
     invoiceNotes: "",
   });
   const [editLineItems, setEditLineItems] = useState<LineItem[]>([]);
@@ -107,6 +106,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
+    let unsubscribeServices: (() => void) | null = null;
     const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
       if (u) {
         setUser(u);
@@ -126,13 +126,30 @@ export default function AdminPage() {
               console.error("Firestore Error:", error);
           },
         );
+        const servicesQuery = query(collection(db, "services"), orderBy("name"));
+        unsubscribeServices = onSnapshot(
+          servicesQuery,
+          (snap) => {
+            setCatalogServices(
+              snap.docs.map(
+                (d) => ({ id: d.id, ...d.data() }) as CatalogService,
+              ),
+            );
+          },
+          (error) => {
+            if (error.code !== "permission-denied")
+              console.error("Firestore Services Error:", error);
+          },
+        );
       } else {
         if (unsubscribeSnapshot) unsubscribeSnapshot();
+        if (unsubscribeServices) unsubscribeServices();
         router.push("/login");
       }
     });
     return () => {
       if (unsubscribeSnapshot) unsubscribeSnapshot();
+      if (unsubscribeServices) unsubscribeServices();
       unsubscribeAuth();
     };
   }, [router]);
@@ -357,7 +374,8 @@ export default function AdminPage() {
                         onBlur={(e) => handlePrice(job.id, e.target.value)}
                         className="bg-transparent font-bold w-20 outline-none"
                       />
-                      {job.price && (
+                      {(job.price ||
+                        (job.lineItems && job.lineItems.length > 0)) && (
                         <div className="flex items-center gap-2 border-l pl-2 border-gray-300">
                           <a
                             href={`/invoice/${job.id}`}
@@ -377,7 +395,7 @@ export default function AdminPage() {
                               setEditingJob(job);
                               setEditForm({
                                 discount: job.discount || 0,
-                                taxRate: job.taxRate || 13,
+                                taxRate: job.taxRate || 0,
                                 invoiceNotes: job.invoiceNotes || "",
                               });
                               setEditLineItems(
@@ -483,98 +501,12 @@ export default function AdminPage() {
             <div className="grid md:grid-cols-2 gap-8 max-h-[72vh] overflow-auto">
               <div className="space-y-4 pr-1">
                 {/* LINE ITEMS EDITOR */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-xs font-bold text-gray-500 uppercase">
-                      Line Items
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditLineItems([...editLineItems, emptyLineItem()])
-                      }
-                      className="text-xs font-bold text-[#D4AF37] hover:underline"
-                    >
-                      + Add item
-                    </button>
-                  </div>
-                  {editLineItems.length === 0 && (
-                    <p className="text-xs text-gray-400 mb-2">
-                      No line items — the invoice uses the job&apos;s single
-                      price. Add items for a detailed breakdown.
-                    </p>
-                  )}
-                  <div className="space-y-2">
-                    {editLineItems.map((li, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <input
-                          value={li.description}
-                          onChange={(e) =>
-                            setEditLineItems(
-                              editLineItems.map((x, i) =>
-                                i === idx
-                                  ? { ...x, description: e.target.value }
-                                  : x,
-                              ),
-                            )
-                          }
-                          placeholder="Description"
-                          className="flex-1 bg-gray-50 p-2 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                        />
-                        <input
-                          type="number"
-                          min={1}
-                          value={li.quantity}
-                          onChange={(e) =>
-                            setEditLineItems(
-                              editLineItems.map((x, i) =>
-                                i === idx
-                                  ? {
-                                      ...x,
-                                      quantity: parseInt(e.target.value) || 1,
-                                    }
-                                  : x,
-                              ),
-                            )
-                          }
-                          className="w-14 bg-gray-50 p-2 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                          title="Qty"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          value={li.unitPrice}
-                          onChange={(e) =>
-                            setEditLineItems(
-                              editLineItems.map((x, i) =>
-                                i === idx
-                                  ? {
-                                      ...x,
-                                      unitPrice:
-                                        parseFloat(e.target.value) || 0,
-                                    }
-                                  : x,
-                              ),
-                            )
-                          }
-                          className="w-20 bg-gray-50 p-2 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
-                          title="Unit price ($)"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditLineItems(
-                              editLineItems.filter((_, i) => i !== idx),
-                            )
-                          }
-                          className="text-gray-300 hover:text-red-500 transition-colors"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <LineItemsEditor
+                  lineItems={editLineItems}
+                  onChange={setEditLineItems}
+                  catalogServices={catalogServices}
+                  emptyMessage="No line items - the invoice uses the job's single price. Add items for a detailed breakdown."
+                />
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
                     Discount Amount ($)

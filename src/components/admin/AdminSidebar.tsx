@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { LayoutDashboard, FileText, CalendarDays, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, FileText, CalendarDays, Users, LogOut, ListChecks } from "lucide-react";
 
-export type AdminNav = "dashboard" | "invoices" | "schedule" | "clients";
+export type AdminNav = "dashboard" | "invoices" | "schedule" | "clients" | "services";
 
 const ITEMS: { key: AdminNav; href: string; label: string; Icon: typeof LayoutDashboard }[] = [
     { key: "dashboard", href: "/admin", label: "Dashboard", Icon: LayoutDashboard },
     { key: "invoices", href: "/admin/invoices", label: "Invoices", Icon: FileText },
     { key: "schedule", href: "/admin/schedule", label: "Schedule", Icon: CalendarDays },
     { key: "clients", href: "/admin/clients", label: "Clients", Icon: Users },
+    { key: "services", href: "/admin/services", label: "Services", Icon: ListChecks },
 ];
 
 export function AdminSidebar({ active }: { active: AdminNav }) {

@@ -37,9 +37,11 @@ import {
   validateQuote,
   validateJobUpdate,
   validateClient,
+  validateInvoiceCreate,
   validateId,
   validateBooking,
   validatePaymentMethod,
+  validateService,
 } from "@/lib/validation";
 import { enforceRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { isValidTransition, JOB_WORKFLOW } from "@/lib/fsm_logic";
@@ -147,6 +149,20 @@ async function assignInvoiceNumber(
 
     return { invoiceNumber: next, invoicedAt };
   });
+}
+
+function buildLineItemServiceSummary(
+  lineItems: { description: string; quantity: number }[],
+): string {
+  return (
+    lineItems
+      .map((item) =>
+        item.quantity > 1
+          ? `${item.description} (${item.quantity})`
+          : item.description,
+      )
+      .join(", ") || "Cleaning Service"
+  );
 }
 
 // ============================================
@@ -304,6 +320,56 @@ async function sendQuoteConfirmation(lead: {
 // ============================================
 // 🔒 PROTECTED ADMIN ACTIONS
 // ============================================
+export async function createService(serviceData: unknown) {
+  try {
+    await requireAdmin();
+    const validated = validateService(serviceData);
+    const serviceRef = await adminDb.collection("services").add({
+      name: validated.name,
+      description: validated.description || "",
+      unitPrice: validated.unitPrice,
+      createdAt: Timestamp.now(),
+    });
+    revalidatePath("/admin/services");
+    return { success: true, serviceId: serviceRef.id };
+  } catch (error) {
+    return handleServerActionError(error, "createService");
+  }
+}
+
+export async function updateService(id: string, serviceData: unknown) {
+  try {
+    await requireAdmin();
+    const serviceId = validateId(id);
+    const validated = validateService(serviceData);
+    await adminDb
+      .collection("services")
+      .doc(serviceId)
+      .update({
+        name: validated.name,
+        description: validated.description || "",
+        unitPrice: validated.unitPrice,
+        lastUpdated: Timestamp.now(),
+      });
+    revalidatePath("/admin/services");
+    return { success: true };
+  } catch (error) {
+    return handleServerActionError(error, "updateService");
+  }
+}
+
+export async function deleteService(id: string) {
+  try {
+    await requireAdmin();
+    const serviceId = validateId(id);
+    await adminDb.collection("services").doc(serviceId).delete();
+    revalidatePath("/admin/services");
+    return { success: true };
+  } catch (error) {
+    return handleServerActionError(error, "deleteService");
+  }
+}
+
 export async function createClient(clientData: unknown) {
   await requireAdmin();
   try {
@@ -535,6 +601,48 @@ export async function updateJobDetails(jobId: string, data: unknown) {
     if (error instanceof ZodError)
       return { success: false, error: error.issues[0].message };
     return handleServerActionError(error, "updateJobDetails");
+  }
+}
+
+export async function createInvoiceForClient(clientId: string, data: unknown) {
+  try {
+    await requireAdmin();
+    const validClientId = validateId(clientId);
+    const validated = validateInvoiceCreate(data);
+    const clientSnap = await adminDb
+      .collection("clients")
+      .doc(validClientId)
+      .get();
+    const client = clientSnap.data();
+    if (!client)
+      throw new AppError(
+        "not-found",
+        `Client ${validClientId} not found`,
+        "Client not found",
+      );
+
+    const jobRef = await adminDb.collection("jobs").add({
+      clientId: validClientId,
+      name: String(client.name || ""),
+      email: String(client.email || ""),
+      phone: String(client.phone || ""),
+      address: String(client.address || ""),
+      service: buildLineItemServiceSummary(validated.lineItems),
+      status: "INVOICED",
+      lineItems: validated.lineItems,
+      discount: validated.discount ?? 0,
+      taxRate: validated.taxRate ?? 0,
+      invoiceNotes: validated.invoiceNotes || "",
+      createdAt: Timestamp.now(),
+      lastUpdated: Timestamp.now(),
+    });
+
+    await assignInvoiceNumber(jobRef);
+    revalidatePath("/admin");
+    revalidatePath("/admin/invoices");
+    return { success: true, jobId: jobRef.id };
+  } catch (error) {
+    return handleServerActionError(error, "createInvoiceForClient");
   }
 }
 

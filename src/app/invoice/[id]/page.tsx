@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useParams, useSearchParams } from "next/navigation";
@@ -38,7 +38,7 @@ const fmtDate = (d: Date) =>
     day: "numeric",
   });
 
-export default function InvoicePage() {
+function InvoiceView() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params?.id as string;
@@ -238,5 +238,19 @@ export default function InvoicePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function InvoicePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <Loader2 className="animate-spin text-[#D4AF37]" size={48} />
+        </div>
+      }
+    >
+      <InvoiceView />
+    </Suspense>
   );
 }
