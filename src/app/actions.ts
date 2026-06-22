@@ -401,6 +401,32 @@ export async function deleteClient(clientId: string) {
   }
 }
 
+export async function updateClient(clientId: string, clientData: unknown) {
+  await requireAdmin();
+  try {
+    validateId(clientId);
+    const validated = validateClient(clientData);
+    const coordinates = await getGeocode(validated.address);
+    await adminDb
+      .collection("clients")
+      .doc(clientId)
+      .update({
+        name: validated.name,
+        email: validated.email,
+        phone: validated.phone,
+        address: validated.address,
+        propertyNotes: validated.propertyNotes || "",
+        ...(coordinates ? { geolocation: coordinates } : {}),
+        lastUpdated: Timestamp.now(),
+      });
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ZodError)
+      return { success: false, error: error.issues[0].message };
+    return handleServerActionError(error, "updateClient");
+  }
+}
+
 export async function updateClientNotes(clientId: string, notes: string) {
   await requireAdmin();
   try {

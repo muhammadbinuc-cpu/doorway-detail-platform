@@ -51,9 +51,15 @@ function InvoiceView() {
   useEffect(() => {
     if (!id) return;
     const fetchJob = async () => {
-      const snap = await getDoc(doc(db, "jobs", id));
-      if (snap.exists()) setJob({ id: snap.id, ...snap.data() } as InvoiceJob);
-      setLoading(false);
+      try {
+        const snap = await getDoc(doc(db, "jobs", id));
+        if (snap.exists())
+          setJob({ id: snap.id, ...snap.data() } as InvoiceJob);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchJob();
   }, [id]);

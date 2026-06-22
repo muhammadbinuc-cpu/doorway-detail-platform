@@ -71,7 +71,9 @@ src/
 │   │   ├── schedule/page.tsx    # Month calendar of scheduled jobs (plain date math, no dep)
 │   │   └── clients/
 │   │       ├── page.tsx         # Client list
-│   │       └── [id]/page.tsx    # Client detail + job history
+│   │       └── [id]/page.tsx    # Client detail + job history. Inline "Edit" toggle on the
+│   │                            #   header card edits name/email/phone/address (→ updateClient);
+│   │                            #   Property Notes has its own Save (→ updateClientNotes)
 │   │
 │   ├── login/page.tsx
 │   ├── quote/
@@ -221,6 +223,8 @@ CANCELLED     → SCHEDULED  (reschedule)
 
 - **Never recompute invoice totals inline.** Use `computeInvoiceTotals(job)` from `@/lib/invoice` — used by the web invoice, the email, Stripe checkout, and the admin views. It normalizes `lineItems` (falls back to `service`+`price`), applies discount then tax, rounds to cents.
 - `InvoiceEmail` props: `{ clientName, invoiceNumber, invoiceUrl, lineItems, subtotal, discount, taxRate, taxAmount, total, dueDate, business }`.
+- **Lump-sum vs itemized**: the admin invoice modal (`admin/page.tsx`) has a **Total Price ($)** field plus an optional `LineItemsEditor`. Line items, when present, define the total and the price field is disabled; with no line items the invoice falls back to the single `price` (label = `service`, via `normalizeLineItems`). `buildInvoiceUpdate` saves `price` + `lineItems` together; the preview pulls `price` from `editForm`, not the dashboard card.
+- **Invoice "View" can preview pre-invoiced jobs**: `firestore.rules` `allow get` on `jobs` includes `request.auth != null`, so admins can open `/invoice/[id]` for COMPLETED (not-yet-invoiced) jobs. `invoice/[id]/page.tsx` `fetchJob` is wrapped in try/finally so a denied read can't hang the spinner.
 - Sequential numbers via `assignInvoiceNumber(jobRef)` in `actions.ts` — a Firestore transaction on `counters/invoices`. **Idempotent**: re-sending an invoiced job does NOT bump the number. Assigned on first `→ INVOICED` (both `emailInvoice` and a manual `updateJobStatus`).
 - Business identity (name, address, phone, HST#) lives in `@/lib/business` `BUSINESS`.
 
@@ -231,6 +235,10 @@ CANCELLED     → SCHEDULED  (reschedule)
 - **Overdue / reminders**: predicates `isOverdue(job, now)` and `isReminderDue(job, now)` in `@/lib/invoice` (gentle policy: remind once overdue, then every 3 days, max 3). **Unit-tested — change the policy there, not inline.**
 - **Cron**: `vercel.json` runs `GET /api/cron/invoice-reminders` daily (14:00 UTC). It auto-flags overdue `INVOICED→UNPAID` and sends due reminders. Auth: requires `Authorization: Bearer $CRON_SECRET` (Vercel injects this) — **fails closed** (503) if `CRON_SECRET` unset, 401 on mismatch.
 - ⚠️ **`"use server"` gotcha**: every export from `actions.ts` is a PUBLIC endpoint. The unauthenticated reminder body lives in `src/lib/server/invoice-reminder.ts` (`import 'server-only'`) so it's reachable only from the admin action (gated by `requireAdmin`) and the cron route (gated by `CRON_SECRET`) — never expose it as an action.
+
+### Clients
+
+- `updateClient(clientId, data)` edits core fields (name/email/phone/address + propertyNotes); validates with `validateClient`, **re-geocodes** the address and only overwrites `geolocation` when geocode succeeds (preserves existing coords on lookup failure). `updateClientNotes` is the notes-only fast path used by the Property Notes box. `createClient`/`deleteClient` round it out — all in `actions.ts`. UI: inline "Edit" toggle on the client detail header card (`admin/clients/[id]/page.tsx`).
 
 ---
 

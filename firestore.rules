@@ -6,11 +6,14 @@ service cloud.firestore {
     match /jobs/{jobId} {
       
       // 🔒 READ RULES:
-      // - GET (single document): Allow only for payable/paid invoices so the public
-      //   invoice page can load. UNPAID is included because the reminder cron flips
+      // - GET (single document): Authenticated admins can read any job (they can already
+      //   LIST all jobs, so this leaks nothing new — and lets them preview an invoice
+      //   before it's sent). Unauthenticated public can only get payable/paid invoices so
+      //   the public invoice page works. UNPAID is included because the reminder cron flips
       //   overdue INVOICED → UNPAID, and those customers must still be able to pay.
       // - LIST (query): Block for unauthenticated users (prevents data scraping/enumeration)
-      allow get: if resource.data.status == 'INVOICED'
+      allow get: if request.auth != null
+                 || resource.data.status == 'INVOICED'
                  || resource.data.status == 'UNPAID'
                  || resource.data.status == 'PAID';
       allow list: if request.auth != null;

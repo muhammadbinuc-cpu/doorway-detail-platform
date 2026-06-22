@@ -91,6 +91,7 @@ export default function AdminPage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [editForm, setEditForm] = useState({
+    price: 0,
     discount: 0,
     taxRate: 0,
     invoiceNotes: "",
@@ -126,7 +127,10 @@ export default function AdminPage() {
               console.error("Firestore Error:", error);
           },
         );
-        const servicesQuery = query(collection(db, "services"), orderBy("name"));
+        const servicesQuery = query(
+          collection(db, "services"),
+          orderBy("name"),
+        );
         unsubscribeServices = onSnapshot(
           servicesQuery,
           (snap) => {
@@ -394,6 +398,7 @@ export default function AdminPage() {
                             onClick={() => {
                               setEditingJob(job);
                               setEditForm({
+                                price: job.price || 0,
                                 discount: job.discount || 0,
                                 taxRate: job.taxRate || 0,
                                 invoiceNotes: job.invoiceNotes || "",
@@ -500,12 +505,35 @@ export default function AdminPage() {
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-h-[72vh] overflow-auto">
               <div className="space-y-4 pr-1">
+                {/* TOTAL PRICE — used when there are no line items */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                    Total Price ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={editForm.price}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        price: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    disabled={editLineItems.length > 0}
+                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-xs text-gray-400 mt-1 font-medium">
+                    {editLineItems.length > 0
+                      ? "Line items below set the total. Remove them to charge a single price."
+                      : "Charge one lump sum. Add line items below only if you want to break it down."}
+                  </p>
+                </div>
                 {/* LINE ITEMS EDITOR */}
                 <LineItemsEditor
                   lineItems={editLineItems}
                   onChange={setEditLineItems}
                   catalogServices={catalogServices}
-                  emptyMessage="No line items - the invoice uses the job's single price. Add items for a detailed breakdown."
+                  emptyMessage="No line items - the invoice uses the Total Price above. Add items for a detailed breakdown."
                 />
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
@@ -615,7 +643,7 @@ export default function AdminPage() {
                   );
                   const t = computeInvoiceTotals({
                     lineItems: cleaned,
-                    price: editingJob.price,
+                    price: editForm.price,
                     service: editingJob.service,
                     discount: editForm.discount,
                     taxRate: editForm.taxRate,
