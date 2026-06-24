@@ -26,6 +26,7 @@ interface InvoiceEmailProps {
   invoiceNumber: string;
   invoiceUrl: string;
   lineItems: LineItem[];
+  invoiceItems?: string[];
   subtotal: number;
   discount: number;
   taxRate: number;
@@ -43,6 +44,7 @@ export const InvoiceEmail = ({
   invoiceNumber,
   invoiceUrl,
   lineItems,
+  invoiceItems,
   subtotal,
   discount,
   taxRate,
@@ -102,6 +104,14 @@ export const InvoiceEmail = ({
                   </Column>
                 </Row>
               ))}
+
+              {invoiceItems && invoiceItems.length > 0
+                ? invoiceItems.map((item, i) => (
+                    <Text key={`inc-${i}`} style={includedItem}>
+                      • {item}
+                    </Text>
+                  ))
+                : null}
 
               <Hr style={hr} />
 
@@ -272,6 +282,13 @@ const itemPrice = {
   fontWeight: "700",
   color: "#000000",
   margin: "0",
+};
+
+const includedItem = {
+  fontSize: "13px",
+  fontWeight: "600",
+  color: "#6b7280",
+  margin: "0 0 4px",
 };
 
 const hr = {

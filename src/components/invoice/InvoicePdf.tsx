@@ -13,6 +13,7 @@ export interface InvoicePdfProps {
   dueDate: string;
   status: string;
   lineItems: LineItem[];
+  invoiceItems?: string[];
   subtotal: number;
   discount: number;
   taxRate: number;
@@ -65,6 +66,7 @@ const styles = StyleSheet.create({
   totalText: { fontSize: 14, fontFamily: "Helvetica-Bold" },
   gold: { color: GOLD },
   muted: { color: "#6b7280" },
+  includedItem: { color: "#6b7280", marginBottom: 4 },
   notes: {
     marginTop: 20,
     padding: 12,
@@ -120,6 +122,13 @@ export default function InvoicePdf(p: InvoicePdfProps) {
               </Text>
             </View>
           ))}
+          {p.invoiceItems && p.invoiceItems.length > 0
+            ? p.invoiceItems.map((it, i) => (
+                <Text key={`inc-${i}`} style={styles.includedItem}>
+                  • {it}
+                </Text>
+              ))
+            : null}
           <View style={styles.divider} />
           <View style={styles.item}>
             <Text style={styles.muted}>Subtotal</Text>

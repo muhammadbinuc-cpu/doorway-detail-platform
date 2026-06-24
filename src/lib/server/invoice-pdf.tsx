@@ -45,6 +45,12 @@ export async function renderInvoicePdf(
       dueDate: fmtDate(dueDate),
       status: job.status ?? "",
       lineItems: totals.lineItems,
+      // Included-items list only applies in the lump "one price + list" mode
+      // (i.e. when there are no explicit priced line items).
+      invoiceItems:
+        Array.isArray(job.lineItems) && job.lineItems.length > 0
+          ? undefined
+          : job.invoiceItems,
       subtotal: totals.subtotal,
       discount: totals.discount,
       taxRate: totals.taxRate,

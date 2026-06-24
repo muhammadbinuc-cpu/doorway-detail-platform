@@ -26,6 +26,7 @@ interface InvoiceJob {
   discount?: number;
   taxRate?: number;
   lineItems?: LineItem[];
+  invoiceItems?: string[];
   invoiceNumber?: number;
   invoiceNotes?: string;
   invoicedAt?: { seconds?: number };
@@ -47,6 +48,7 @@ function InvoiceView() {
   const [paying, setPaying] = useState(false);
 
   const paymentSuccess = searchParams.get("success") === "true";
+  const paymentCanceled = searchParams.get("canceled") === "true";
 
   useEffect(() => {
     if (!id) return;
@@ -175,6 +177,22 @@ function InvoiceView() {
               </div>
             ))}
 
+            {job.invoiceItems &&
+              job.invoiceItems.length > 0 &&
+              !(job.lineItems && job.lineItems.length > 0) && (
+                <ul className="mt-2 space-y-1">
+                  {job.invoiceItems.map((item, i) => (
+                    <li
+                      key={i}
+                      className="flex gap-2 text-sm text-gray-500 font-medium"
+                    >
+                      <span className="text-[#D4AF37]">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
             <div className="border-t border-gray-200 mt-4 pt-4 space-y-2">
               <div className="flex justify-between items-center text-gray-500 text-sm">
                 <span>Subtotal</span>
@@ -206,6 +224,13 @@ function InvoiceView() {
               <p className="text-gray-600 text-sm whitespace-pre-wrap">
                 {job.invoiceNotes}
               </p>
+            </div>
+          )}
+
+          {paymentCanceled && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-5 py-4 mb-4 text-sm font-medium">
+              Payment was canceled — no charge was made. You can try again
+              below, or contact us at {BUSINESS.phone} if you ran into trouble.
             </div>
           )}
 

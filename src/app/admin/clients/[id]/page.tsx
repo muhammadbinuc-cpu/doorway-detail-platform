@@ -274,9 +274,9 @@ export default function ClientProfile() {
                       <h1 className="text-4xl font-black">{client.name}</h1>
                       <button
                         onClick={startEditing}
-                        className="text-sm font-bold text-[#D4AF37] hover:underline flex items-center gap-1 shrink-0"
+                        className="text-sm font-bold text-black bg-[#D4AF37]/15 hover:bg-[#D4AF37] border border-[#D4AF37] px-3 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0 transition-colors"
                       >
-                        <Pencil size={14} /> Edit
+                        <Pencil size={14} /> Edit details
                       </button>
                     </div>
                     <div className="space-y-3 text-gray-600 font-medium">

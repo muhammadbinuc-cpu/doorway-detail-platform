@@ -16,7 +16,11 @@ import Stripe from "stripe";
 import { ZodError } from "zod";
 import InvoiceEmail from "@/components/email/InvoiceEmail";
 import QuoteConfirmationEmail from "@/components/email/QuoteConfirmationEmail";
+import NewLeadEmail from "@/components/email/NewLeadEmail";
+import ReviewRequestEmail from "@/components/email/ReviewRequestEmail";
+import CustomMessageEmail from "@/components/email/CustomMessageEmail";
 import { computeInvoiceTotals, getDueDate } from "@/lib/invoice";
+import { lookupPromo } from "@/lib/promos";
 import {
   BUSINESS,
   INVOICE_NUMBER_START,
@@ -214,8 +218,23 @@ export async function revokeSession() {
 export async function submitQuote(formData: unknown) {
   try {
     await enforceRateLimit("quote");
-    const { name, email, phone, address, service } = validateQuote(formData);
+    const {
+      name,
+      email,
+      phone,
+      address,
+      service,
+      details,
+      preferredDate,
+      preferredWindow,
+      promoCode,
+      source,
+    } = validateQuote(formData);
     await ServiceLayer.logEvent("QUOTE_SUBMITTED", { email });
+
+    // Validate the promo against the real table so a bogus ?promo= can't grant
+    // a discount. promo is null for unknown/empty codes.
+    const promo = lookupPromo(promoCode);
 
     let clientId: string;
     const q = await adminDb
@@ -251,12 +270,41 @@ export async function submitQuote(formData: unknown) {
       address,
       service,
       status: "LEAD_RECEIVED",
+      // Free-text "anything else" — its own field (not in the service string).
+      ...(details ? { details } : {}),
+      // Customer's requested timing (non-binding) — admin confirms the booking.
+      ...(preferredDate ? { preferredDate } : {}),
+      ...(preferredWindow ? { preferredWindow } : {}),
+      // Validated promo: store the code + the real discount to auto-apply at
+      // invoice time, plus the attribution source.
+      ...(promo
+        ? { promoCode: promo.code, promoDiscount: promo.discount }
+        : {}),
+      ...(source ? { source } : {}),
       createdAt: Timestamp.now(),
     });
 
     // 🟢 Instant confirmation to the customer — non-blocking: a missing
     // Resend/Twilio key (or a send failure) must NEVER fail lead capture.
-    await sendQuoteConfirmation({ name, email, phone, service });
+    const delivery = await sendQuoteConfirmation({
+      name,
+      email,
+      phone,
+      service,
+    });
+
+    // 🟢 Owner notification for EVERY lead — non-blocking. So a failed customer
+    // confirmation (e.g. a misconfigured Twilio number) never silently loses a
+    // lead: the owner always learns about it and can follow up manually.
+    await notifyOwnerOfLead({
+      name,
+      email,
+      phone,
+      service,
+      details,
+      promoLabel: promo ? `${promo.code} (-$${promo.discount})` : "",
+      delivery,
+    });
 
     return { success: true, jobId: newJob.id };
   } catch (error) {
@@ -275,7 +323,7 @@ async function sendQuoteConfirmation(lead: {
   email: string;
   phone: string;
   service: string;
-}) {
+}): Promise<{ emailOk: boolean; smsOk: boolean | null }> {
   // Show the services list without the internal notes/meta suffix.
   const services = lead.service.split(" | ")[0] || lead.service;
 
@@ -295,6 +343,8 @@ async function sendQuoteConfirmation(lead: {
     );
   }
 
+  // smsOk: null = not attempted (no phone), true = sent, false = failed.
+  let smsOk: boolean | null = null;
   if (lead.phone) {
     try {
       const twilio = getTwilioClient();
@@ -303,8 +353,10 @@ async function sendQuoteConfirmation(lead: {
         from: process.env.TWILIO_FROM_NUMBER,
         to: lead.phone,
       });
+      smsOk = true;
     } catch (e) {
       console.error("Quote confirmation SMS failed (non-blocking):", e);
+      smsOk = false;
     }
   }
 
@@ -314,6 +366,55 @@ async function sendQuoteConfirmation(lead: {
     });
   } catch {
     /* logging is best-effort */
+  }
+
+  return { emailOk: emailResult.ok, smsOk };
+}
+
+/**
+ * Notify the business owner of a new lead. Non-blocking and never throws — it
+ * must never fail lead capture. Surfaces whether the customer-facing
+ * confirmations went out so the owner can follow up if a channel failed.
+ */
+async function notifyOwnerOfLead(args: {
+  name: string;
+  email: string;
+  phone: string;
+  service: string;
+  details?: string;
+  promoLabel?: string;
+  delivery: { emailOk: boolean; smsOk: boolean | null };
+}) {
+  try {
+    const ownerTo = sanitizeKey(process.env.GMAIL_USER) || BUSINESS.email;
+    if (!ownerTo) return;
+    const services = args.service.split(" | ")[0] || args.service;
+    const notesParts = [
+      args.details?.trim() || "",
+      args.promoLabel ? `Promo: ${args.promoLabel}` : "",
+    ].filter(Boolean);
+    const result = await sendMail({
+      to: ownerTo,
+      subject: `New lead — ${args.name}`,
+      react: NewLeadEmail({
+        businessName: BUSINESS.name,
+        customerName: args.name,
+        customerEmail: args.email,
+        customerPhone: args.phone,
+        services,
+        notes: notesParts.length ? notesParts.join(" · ") : undefined,
+        emailOk: args.delivery.emailOk,
+        smsOk: args.delivery.smsOk,
+      }),
+    });
+    if (!result.ok) {
+      console.error(
+        "Owner lead notification failed (non-blocking):",
+        result.error,
+      );
+    }
+  } catch (e) {
+    console.error("Owner lead notification failed (non-blocking):", e);
   }
 }
 
@@ -421,8 +522,22 @@ export async function updateClient(clientId: string, clientData: unknown) {
       });
     return { success: true };
   } catch (error) {
-    if (error instanceof ZodError)
-      return { success: false, error: error.issues[0].message };
+    if (error instanceof ZodError) {
+      const issue = error.issues[0];
+      const field = String(issue.path[0] ?? "");
+      const labels: Record<string, string> = {
+        name: "Name",
+        email: "Email",
+        phone: "Phone",
+        address: "Address",
+        propertyNotes: "Notes",
+      };
+      const label = labels[field];
+      return {
+        success: false,
+        error: label ? `${label}: ${issue.message}` : issue.message,
+      };
+    }
     return handleServerActionError(error, "updateClient");
   }
 }
@@ -476,6 +591,84 @@ export async function createJobFromClient(clientId: string) {
   }
 }
 
+/**
+ * 🔒 Send a one-off custom message to a customer via SMS and/or email.
+ * channel: "sms" | "email" | "both".
+ */
+export async function messageCustomer(
+  jobId: string,
+  channel: string,
+  message: string,
+) {
+  await requireAdmin();
+  try {
+    validateId(jobId);
+    const msg = String(message || "")
+      .trim()
+      .slice(0, 1000)
+      .replace(/<[^>]*>/g, "");
+    if (!msg)
+      throw new AppError(
+        "validation-error",
+        "Empty message",
+        "Message cannot be empty",
+      );
+    const wantSms = channel === "sms" || channel === "both";
+    const wantEmail = channel === "email" || channel === "both";
+
+    const job = (await adminDb.collection("jobs").doc(jobId).get()).data();
+    if (!job)
+      throw new AppError(
+        "not-found",
+        `Job ${jobId} not found`,
+        "Job not found",
+      );
+
+    let smsOk: boolean | null = null;
+    let emailOk: boolean | null = null;
+
+    if (wantSms && job.phone) {
+      try {
+        const twilio = getTwilioClient();
+        await twilio.messages.create({
+          body: `${msg}\n— ${BUSINESS.name}`,
+          from: process.env.TWILIO_FROM_NUMBER,
+          to: job.phone,
+        });
+        smsOk = true;
+      } catch (e) {
+        console.error("Custom message SMS failed:", e);
+        smsOk = false;
+      }
+    }
+
+    if (wantEmail && job.email) {
+      const res = await sendMail({
+        to: job.email,
+        subject: `A message from ${BUSINESS.name}`,
+        react: CustomMessageEmail({
+          clientName: job.name,
+          message: msg,
+          business: BUSINESS,
+        }),
+      });
+      emailOk = res.ok;
+    }
+
+    // Surface a failure only if nothing actually went out.
+    if (smsOk !== true && emailOk !== true) {
+      throw new AppError(
+        "delivery-error",
+        "No channel delivered",
+        "Message could not be sent — check the customer has a phone/email.",
+      );
+    }
+    return { success: true, smsOk, emailOk };
+  } catch (error) {
+    return handleServerActionError(error, "messageCustomer");
+  }
+}
+
 export async function updateJobStatus(jobId: string, newStatus: string) {
   await requireAdmin();
   try {
@@ -509,10 +702,60 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
     }
 
     await jobRef.update({ status: newStatus, lastUpdated: Timestamp.now() });
+
+    // 🟢 First time a job is completed, ask for a review — non-blocking.
+    if (newStatus === "COMPLETED" && !job.reviewRequestSent) {
+      await sendReviewRequest(jobId, job);
+    }
+
     revalidatePath("/admin");
     return { success: true };
   } catch (error) {
     return handleServerActionError(error, "updateJobStatus");
+  }
+}
+
+/**
+ * Send a thank-you + review-link to the customer (email + SMS, non-blocking).
+ * No-ops if no review URL is configured. Marks the job so it's sent only once.
+ */
+async function sendReviewRequest(
+  jobId: string,
+  job: FirebaseFirestore.DocumentData,
+) {
+  if (!BUSINESS.reviewUrl) return;
+  try {
+    if (job.email) {
+      const res = await sendMail({
+        to: job.email,
+        subject: `Thanks from ${BUSINESS.name} — how did we do?`,
+        react: ReviewRequestEmail({
+          clientName: job.name,
+          reviewUrl: BUSINESS.reviewUrl,
+          business: BUSINESS,
+        }),
+      });
+      if (!res.ok)
+        console.error("Review request email failed (non-blocking):", res.error);
+    }
+    if (job.phone) {
+      try {
+        const twilio = getTwilioClient();
+        await twilio.messages.create({
+          body: `Thanks for choosing ${BUSINESS.name}, ${job.name}! If we earned it, a quick review means a lot: ${BUSINESS.reviewUrl}`,
+          from: process.env.TWILIO_FROM_NUMBER,
+          to: job.phone,
+        });
+      } catch (e) {
+        console.error("Review request SMS failed (non-blocking):", e);
+      }
+    }
+    await adminDb
+      .collection("jobs")
+      .doc(jobId)
+      .update({ reviewRequestSent: true, lastUpdated: Timestamp.now() });
+  } catch (e) {
+    console.error("Review request failed (non-blocking):", e);
   }
 }
 
@@ -601,6 +844,8 @@ export async function confirmBooking(jobId: string, date: string) {
     await jobRef.update({
       status: "SCHEDULED",
       scheduledDate: validated.date,
+      // Fresh booking/reschedule → allow a new appointment reminder to go out.
+      appointmentReminderSent: false,
       lastUpdated: Timestamp.now(),
     });
     revalidatePath("/admin");
@@ -711,6 +956,10 @@ export async function emailInvoice(jobId: string) {
         invoiceNumber: invoiceLabel,
         invoiceUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}`,
         lineItems: totals.lineItems,
+        invoiceItems:
+          Array.isArray(job.lineItems) && job.lineItems.length > 0
+            ? undefined
+            : (job.invoiceItems as string[] | undefined),
         subtotal: totals.subtotal,
         discount: totals.discount,
         taxRate: totals.taxRate,

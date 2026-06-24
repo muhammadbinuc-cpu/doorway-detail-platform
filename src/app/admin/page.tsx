@@ -24,6 +24,7 @@ import {
   X,
   Truck,
   Repeat,
+  MessageSquare,
 } from "lucide-react";
 import {
   BarChart,
@@ -42,6 +43,7 @@ import {
   sendOnMyWay,
   createRecurringJob,
   deleteJob,
+  messageCustomer,
 } from "../actions";
 import { JOB_WORKFLOW } from "@/lib/fsm_logic";
 import { statusLabel } from "@/lib/job-status";
@@ -75,8 +77,29 @@ interface Job {
   taxRate?: number;
   invoiceNotes?: string;
   lineItems?: LineItem[];
+  invoiceItems?: string[];
   invoiceNumber?: number;
+  preferredDate?: string;
+  preferredWindow?: string;
+  details?: string;
+  promoCode?: string;
+  promoDiscount?: number;
 }
+
+// Default clock time we pre-fill the scheduler with for each requested window.
+const WINDOW_START: Record<string, string> = {
+  Morning: "09:00",
+  Afternoon: "13:00",
+  Evening: "17:00",
+};
+
+// Build a datetime-local value ("YYYY-MM-DDTHH:mm") from a job's requested
+// preferred date + window, so opening the scheduler pre-fills their request.
+const preferredDateTimeLocal = (job: Job): string => {
+  if (!job.preferredDate) return "";
+  const time = WINDOW_START[job.preferredWindow ?? ""] ?? "09:00";
+  return `${job.preferredDate}T${time}`;
+};
 
 const getNextStatuses = (currentStatus: string): string[] => {
   const allowed = JOB_WORKFLOW[currentStatus] || [];
@@ -97,11 +120,20 @@ export default function AdminPage() {
     invoiceNotes: "",
   });
   const [editLineItems, setEditLineItems] = useState<LineItem[]>([]);
+  const [editInvoiceItems, setEditInvoiceItems] = useState<string[]>([]);
+  const [invoiceMode, setInvoiceMode] = useState<"lump" | "itemized">("lump");
   const [syncingJobId, setSyncingJobId] = useState<string | null>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [schedulingJobId, setSchedulingJobId] = useState<string | null>(null);
   const [scheduleDate, setScheduleDate] = useState("");
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [messagingJob, setMessagingJob] = useState<Job | null>(null);
+  const [messageBody, setMessageBody] = useState("");
+  const [messageChannel, setMessageChannel] = useState<
+    "sms" | "email" | "both"
+  >("sms");
+  const [sendingMessage, setSendingMessage] = useState(false);
   const router = useRouter();
   const confirm = useConfirm();
 
@@ -211,16 +243,29 @@ export default function AdminPage() {
     await updateJobDetails(id, { price: parseFloat(val) });
   };
   // Build the invoice-details payload from the modal's current edits.
-  const buildInvoiceUpdate = () => ({
-    ...editForm,
-    lineItems: editLineItems
-      .filter((li) => li.description.trim() && li.quantity > 0)
-      .map((li) => ({
-        description: li.description.trim(),
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-      })),
-  });
+  // The two modes are mutually exclusive in storage: itemized writes priced
+  // lineItems (and clears invoiceItems); "one price + list" writes the lump
+  // price plus description-only invoiceItems (and clears lineItems).
+  const buildInvoiceUpdate = () => {
+    if (invoiceMode === "itemized") {
+      return {
+        ...editForm,
+        lineItems: editLineItems
+          .filter((li) => li.description.trim() && li.quantity > 0)
+          .map((li) => ({
+            description: li.description.trim(),
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+          })),
+        invoiceItems: [],
+      };
+    }
+    return {
+      ...editForm,
+      lineItems: [],
+      invoiceItems: editInvoiceItems.map((it) => it.trim()).filter(Boolean),
+    };
+  };
   const handleSendInvoice = async (id: string) => {
     if (
       !(await confirm({
@@ -244,6 +289,28 @@ export default function AdminPage() {
     const res = await sendOnMyWay(id);
     if (res.success) toast.success("SMS sent");
     else toast.error(errText(res));
+  };
+  const openMessage = (job: Job) => {
+    setMessagingJob(job);
+    setMessageBody("");
+    setMessageChannel("sms");
+    setIsMessageModalOpen(true);
+  };
+  const handleSendMessage = async () => {
+    if (!messagingJob || !messageBody.trim()) return;
+    setSendingMessage(true);
+    const res = await messageCustomer(
+      messagingJob.id,
+      messageChannel,
+      messageBody.trim(),
+    );
+    setSendingMessage(false);
+    if (res.success) {
+      toast.success("Message sent");
+      setIsMessageModalOpen(false);
+    } else {
+      toast.error(errText(res));
+    }
   };
   const handleRecurring = async (id: string) => {
     if (
@@ -370,6 +437,23 @@ export default function AdminPage() {
                         <Phone size={14} /> {job.phone}
                       </span>
                     </div>
+                    {job.preferredDate && (
+                      <div className="text-xs font-bold text-[#6B5010] bg-[#D4AF37]/10 px-2 py-1 rounded w-fit">
+                        Prefers: {job.preferredDate}
+                        {job.preferredWindow ? ` · ${job.preferredWindow}` : ""}
+                      </div>
+                    )}
+                    {job.promoCode && (
+                      <div className="text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded w-fit">
+                        Promo: {job.promoCode}
+                        {job.promoDiscount ? ` (−$${job.promoDiscount})` : ""}
+                      </div>
+                    )}
+                    {job.details && (
+                      <p className="text-xs text-gray-500 italic max-w-md">
+                        “{job.details}”
+                      </p>
+                    )}
                     <div className="flex items-center gap-2 mt-2 bg-gray-50 p-2 rounded w-fit">
                       <span className="font-bold text-gray-400">$</span>
                       <input
@@ -399,15 +483,28 @@ export default function AdminPage() {
                               setEditingJob(job);
                               setEditForm({
                                 price: job.price || 0,
-                                discount: job.discount || 0,
+                                // Auto-apply a validated promo discount the
+                                // first time (respects an explicit 0 once set).
+                                discount:
+                                  job.discount ?? job.promoDiscount ?? 0,
                                 taxRate: job.taxRate || 0,
                                 invoiceNotes: job.invoiceNotes || "",
                               });
+                              const hasItemized =
+                                !!job.lineItems && job.lineItems.length > 0;
                               setEditLineItems(
-                                job.lineItems && job.lineItems.length > 0
-                                  ? job.lineItems.map((li) => ({ ...li }))
+                                hasItemized
+                                  ? (job.lineItems ?? []).map((li) => ({
+                                      ...li,
+                                    }))
                                   : [],
                               );
+                              setEditInvoiceItems(
+                                job.invoiceItems && job.invoiceItems.length > 0
+                                  ? [...job.invoiceItems]
+                                  : [],
+                              );
+                              setInvoiceMode(hasItemized ? "itemized" : "lump");
                               setShowSettingsModal(true);
                             }}
                             className="text-gray-400 hover:text-black transition-colors"
@@ -425,6 +522,7 @@ export default function AdminPage() {
                       <button
                         onClick={() => {
                           setSchedulingJobId(job.id);
+                          setScheduleDate(preferredDateTimeLocal(job));
                           setIsScheduleModalOpen(true);
                         }}
                         disabled={syncingJobId === job.id}
@@ -471,6 +569,12 @@ export default function AdminPage() {
                       </button>
                     )}
                     <button
+                      onClick={() => openMessage(job)}
+                      className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-200 transition-all"
+                    >
+                      <MessageSquare size={14} /> Message
+                    </button>
+                    <button
                       onClick={() => handleDelete(job.id)}
                       className="bg-red-50 text-red-500 px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-all"
                     >
@@ -505,36 +609,123 @@ export default function AdminPage() {
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-h-[72vh] overflow-auto">
               <div className="space-y-4 pr-1">
-                {/* TOTAL PRICE — used when there are no line items */}
+                {/* PRICING STYLE TOGGLE */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
-                    Total Price ($)
+                    Pricing style
                   </label>
-                  <input
-                    type="number"
-                    value={editForm.price}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        price: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    disabled={editLineItems.length > 0}
-                    className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <p className="text-xs text-gray-400 mt-1 font-medium">
-                    {editLineItems.length > 0
-                      ? "Line items below set the total. Remove them to charge a single price."
-                      : "Charge one lump sum. Add line items below only if you want to break it down."}
-                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceMode("lump")}
+                      className={`p-3 rounded-xl text-sm font-bold border transition-all ${
+                        invoiceMode === "lump"
+                          ? "bg-[#D4AF37] text-black border-[#D4AF37]"
+                          : "bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100"
+                      }`}
+                    >
+                      One price + list
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceMode("itemized")}
+                      className={`p-3 rounded-xl text-sm font-bold border transition-all ${
+                        invoiceMode === "itemized"
+                          ? "bg-[#D4AF37] text-black border-[#D4AF37]"
+                          : "bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100"
+                      }`}
+                    >
+                      Itemized prices
+                    </button>
+                  </div>
                 </div>
-                {/* LINE ITEMS EDITOR */}
-                <LineItemsEditor
-                  lineItems={editLineItems}
-                  onChange={setEditLineItems}
-                  catalogServices={catalogServices}
-                  emptyMessage="No line items - the invoice uses the Total Price above. Add items for a detailed breakdown."
-                />
+
+                {invoiceMode === "lump" ? (
+                  <>
+                    {/* TOTAL PRICE */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                        Total Price ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.price}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            price: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                      />
+                      <p className="text-xs text-gray-400 mt-1 font-medium">
+                        Charge one total. List what&apos;s included below —
+                        items show on the invoice without individual prices.
+                      </p>
+                    </div>
+                    {/* INCLUDED ITEMS (description-only) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold text-gray-500 uppercase">
+                          Included items (no prices)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditInvoiceItems([...editInvoiceItems, ""])
+                          }
+                          className="text-xs font-bold text-[#D4AF37] hover:underline"
+                        >
+                          + Add item
+                        </button>
+                      </div>
+                      {editInvoiceItems.length === 0 && (
+                        <p className="text-xs text-gray-400 mb-2">
+                          Optional. e.g. &ldquo;Exterior windows — all
+                          floors&rdquo;, &ldquo;Gutter clearing&rdquo;.
+                        </p>
+                      )}
+                      <div className="space-y-2">
+                        {editInvoiceItems.map((it, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <input
+                              value={it}
+                              onChange={(e) =>
+                                setEditInvoiceItems(
+                                  editInvoiceItems.map((v, i) =>
+                                    i === idx ? e.target.value : v,
+                                  ),
+                                )
+                              }
+                              placeholder="Description"
+                              className="flex-1 min-w-0 bg-gray-50 p-2 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditInvoiceItems(
+                                  editInvoiceItems.filter((_, i) => i !== idx),
+                                )
+                              }
+                              className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                              aria-label="Remove item"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* ITEMIZED — each row sets its own price; line items drive the total */
+                  <LineItemsEditor
+                    lineItems={editLineItems}
+                    onChange={setEditLineItems}
+                    catalogServices={catalogServices}
+                    emptyMessage="Add at least one line item — each row sets its own price and the total is the sum."
+                  />
+                )}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
                     Discount Amount ($)
@@ -638,9 +829,16 @@ export default function AdminPage() {
                   Client preview
                 </p>
                 {(() => {
-                  const cleaned = editLineItems.filter(
-                    (li) => li.description.trim() && li.quantity > 0,
-                  );
+                  const cleaned =
+                    invoiceMode === "itemized"
+                      ? editLineItems.filter(
+                          (li) => li.description.trim() && li.quantity > 0,
+                        )
+                      : [];
+                  const previewItems =
+                    invoiceMode === "lump"
+                      ? editInvoiceItems.map((it) => it.trim()).filter(Boolean)
+                      : [];
                   const t = computeInvoiceTotals({
                     lineItems: cleaned,
                     price: editForm.price,
@@ -709,6 +907,19 @@ export default function AdminPage() {
                               </span>
                             </div>
                           ))}
+                          {previewItems.length > 0 && (
+                            <ul className="mt-1 space-y-1">
+                              {previewItems.map((it, i) => (
+                                <li
+                                  key={i}
+                                  className="flex gap-2 text-xs text-gray-500 font-medium"
+                                >
+                                  <span className="text-[#D4AF37]">•</span>
+                                  <span>{it}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           <div className="border-t border-gray-200 mt-3 pt-3 space-y-1 text-xs">
                             <div className="flex justify-between text-gray-500">
                               <span>Subtotal</span>
@@ -772,8 +983,18 @@ export default function AdminPage() {
               Select a date and time to confirm this booking and sync with
               Google Calendar.
             </p>
+            {(() => {
+              const j = jobs.find((job) => job.id === schedulingJobId);
+              return j?.preferredDate ? (
+                <div className="bg-[#D4AF37]/10 text-[#6B5010] text-sm font-bold p-3 rounded-xl mb-4">
+                  Customer requested: {j.preferredDate}
+                  {j.preferredWindow ? ` · ${j.preferredWindow}` : ""}
+                </div>
+              ) : null;
+            })()}
             <input
               type="datetime-local"
+              value={scheduleDate}
               className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none ring-1 ring-gray-200 focus:ring-[#D4AF37] mb-6"
               onChange={(e) => {
                 setScheduleDate(e.target.value);
@@ -828,6 +1049,81 @@ export default function AdminPage() {
                   </span>
                 ) : (
                   "Confirm"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MESSAGE CUSTOMER MODAL */}
+      {isMessageModalOpen && messagingJob && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-black text-xl">
+                Message {messagingJob.name || "customer"}
+              </h3>
+              <button
+                onClick={() => setIsMessageModalOpen(false)}
+                className="text-gray-400 hover:text-black"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {(["sms", "email", "both"] as const).map((ch) => (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => setMessageChannel(ch)}
+                  className={`p-2 rounded-xl text-sm font-bold border transition-all capitalize ${
+                    messageChannel === ch
+                      ? "bg-[#D4AF37] text-black border-[#D4AF37]"
+                      : "bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100"
+                  }`}
+                >
+                  {ch}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={messageBody}
+              onChange={(e) => setMessageBody(e.target.value)}
+              maxLength={1000}
+              placeholder="e.g. Running about 20 minutes late — see you soon!"
+              className="w-full h-32 bg-gray-50 p-3 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-[#D4AF37] resize-none mb-2"
+            />
+            <p className="text-xs text-gray-400 mb-4">
+              {1000 - messageBody.length} characters left · sent to{" "}
+              {messageChannel === "email"
+                ? "email"
+                : messageChannel === "both"
+                  ? "SMS + email"
+                  : "SMS"}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsMessageModalOpen(false)}
+                className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendMessage}
+                disabled={sendingMessage || !messageBody.trim()}
+                className="flex-1 bg-black text-white py-3 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-colors disabled:opacity-50"
+              >
+                {sendingMessage ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="animate-spin" size={16} /> Sending...
+                  </span>
+                ) : (
+                  "Send"
                 )}
               </button>
             </div>

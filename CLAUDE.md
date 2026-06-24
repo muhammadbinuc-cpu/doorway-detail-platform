@@ -223,7 +223,7 @@ CANCELLED     → SCHEDULED  (reschedule)
 
 - **Never recompute invoice totals inline.** Use `computeInvoiceTotals(job)` from `@/lib/invoice` — used by the web invoice, the email, Stripe checkout, and the admin views. It normalizes `lineItems` (falls back to `service`+`price`), applies discount then tax, rounds to cents.
 - `InvoiceEmail` props: `{ clientName, invoiceNumber, invoiceUrl, lineItems, subtotal, discount, taxRate, taxAmount, total, dueDate, business }`.
-- **Lump-sum vs itemized**: the admin invoice modal (`admin/page.tsx`) has a **Total Price ($)** field plus an optional `LineItemsEditor`. Line items, when present, define the total and the price field is disabled; with no line items the invoice falls back to the single `price` (label = `service`, via `normalizeLineItems`). `buildInvoiceUpdate` saves `price` + `lineItems` together; the preview pulls `price` from `editForm`, not the dashboard card.
+- **Invoice pricing modes**: the admin invoice modal (`admin/page.tsx`) has a **Pricing style** toggle with two mutually-exclusive modes. **One price + list** (`invoiceMode === "lump"`): a single **Total Price** drives the total and an optional `invoiceItems: string[]` lists what's included with NO per-item prices (display-only — never affects totals). **Itemized prices** (`invoiceMode === "itemized"`): the `LineItemsEditor` rows each carry a price and their sum is the total. `buildInvoiceUpdate` writes one mode's fields and clears the other's (e.g. lump writes `price`+`invoiceItems` and sets `lineItems: []`). With no line items the invoice falls back to the single `price` (label = `service` with the internal `| Notes:` suffix stripped, via `normalizeLineItems`). `invoiceItems` is rendered as a bullet list under the lump line on the invoice page, email, and PDF (ignored when `lineItems` exist).
 - **Invoice "View" can preview pre-invoiced jobs**: `firestore.rules` `allow get` on `jobs` includes `request.auth != null`, so admins can open `/invoice/[id]` for COMPLETED (not-yet-invoiced) jobs. `invoice/[id]/page.tsx` `fetchJob` is wrapped in try/finally so a denied read can't hang the spinner.
 - Sequential numbers via `assignInvoiceNumber(jobRef)` in `actions.ts` — a Firestore transaction on `counters/invoices`. **Idempotent**: re-sending an invoiced job does NOT bump the number. Assigned on first `→ INVOICED` (both `emailInvoice` and a manual `updateJobStatus`).
 - Business identity (name, address, phone, HST#) lives in `@/lib/business` `BUSINESS`.
@@ -288,7 +288,8 @@ NEXT_PUBLIC_SUPABASE_URL    # Audit logging
 SUPABASE_SERVICE_ROLE_KEY
 MOCK_GEOCODING              # Set to "false" for real Google Maps geocoding
 NEXT_PUBLIC_BUSINESS_HST_NUMBER  # HST/GST number on invoices. MUST be NEXT_PUBLIC_ — the invoice page is a client component, so a server-only var won't render there (falls back to BUSINESS_HST_NUMBER for email-only contexts).
-CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in Vercel; route fails closed if unset)
+CRON_SECRET                 # Auth for the daily reminder crons — invoice AND appointment (set in Vercel; routes fail closed if unset)
+NEXT_PUBLIC_GOOGLE_REVIEW_URL  # Google review link; post-job review request only sends when this is set
 ```
 
 ---
@@ -311,6 +312,16 @@ CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in V
   taxRate?: number;
   invoiceNotes?: string;
   lineItems?: { description: string; quantity: number; unitPrice: number }[];  // optional; falls back to service+price
+  invoiceItems?: string[];  // "one price + list" mode: display-only included items shown under the lump price. Presentational — never affects totals. Mutually exclusive with lineItems.
+  details?: string;         // customer's free-text "anything else" from the quote (up to 500); NOT embedded in `service`
+  preferredDate?: string;   // "YYYY-MM-DD" the customer requested (non-binding; admin confirms)
+  preferredWindow?: 'Morning' | 'Afternoon' | 'Evening';
+  promoCode?: string;       // validated promo (see src/lib/promos.ts)
+  promoDiscount?: number;   // $ discount from the promo; auto-pre-fills the invoice discount field
+  source?: string;          // campaign attribution (?src=)
+  appointmentReminderSent?: boolean;  // set by the appointment-reminder cron; reset to false on (re)booking
+  appointmentReminderAt?: Timestamp;
+  reviewRequestSent?: boolean;        // set once a review request goes out on → COMPLETED
   invoiceNumber?: number;   // sequential, assigned (idempotent) on first → INVOICED
   invoicedAt?: Timestamp;   // when invoiceNumber was assigned; due date = +14 days
   paidAt?: Timestamp;       // set on payment (Stripe webhook or manual Mark Paid)
@@ -347,19 +358,20 @@ CRON_SECRET                 # Auth for the daily invoice-reminder cron (set in V
 
 ## Routes
 
-| Route                         | Auth        | Description                          |
-| ----------------------------- | ----------- | ------------------------------------ |
-| `/`                           | Public      | Landing page                         |
-| `/quote`                      | Public      | Quote submission                     |
-| `/login`                      | Public      | Admin login                          |
-| `/admin`                      | Protected   | Job dashboard                        |
-| `/admin/invoices`             | Protected   | Invoices list (INVOICED/UNPAID/PAID) |
-| `/admin/schedule`             | Protected   | Month calendar of scheduled jobs     |
-| `/admin/clients`              | Protected   | Client list                          |
-| `/admin/clients/[id]`         | Protected   | Client detail                        |
-| `/invoice/[id]`               | Semi-public | Invoice (INVOICED/PAID only)         |
-| `/api/webhooks/stripe`        | Stripe      | Payment confirmation                 |
-| `/api/cron/invoice-reminders` | CRON_SECRET | Daily auto-chase of overdue invoices |
+| Route                             | Auth        | Description                                      |
+| --------------------------------- | ----------- | ------------------------------------------------ |
+| `/`                               | Public      | Landing page                                     |
+| `/quote`                          | Public      | Quote submission                                 |
+| `/login`                          | Public      | Admin login                                      |
+| `/admin`                          | Protected   | Job dashboard                                    |
+| `/admin/invoices`                 | Protected   | Invoices list (INVOICED/UNPAID/PAID)             |
+| `/admin/schedule`                 | Protected   | Month calendar of scheduled jobs                 |
+| `/admin/clients`                  | Protected   | Client list                                      |
+| `/admin/clients/[id]`             | Protected   | Client detail                                    |
+| `/invoice/[id]`                   | Semi-public | Invoice (INVOICED/PAID only)                     |
+| `/api/webhooks/stripe`            | Stripe      | Payment confirmation                             |
+| `/api/cron/invoice-reminders`     | CRON_SECRET | Daily auto-chase of overdue invoices             |
+| `/api/cron/appointment-reminders` | CRON_SECRET | Daily reminder for appointments in the next ~36h |
 
 ---
 
