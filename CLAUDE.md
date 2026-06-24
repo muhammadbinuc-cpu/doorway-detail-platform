@@ -111,6 +111,7 @@ src/
     ├── errors.ts                # AppError class + handleServerActionError()
     ├── rate-limit.ts            # In-memory rate limiting (quote: 5/15min, login: 5/5min)
     ├── env-validator.ts         # requireValidEnv() called at startup in layout.tsx
+    ├── quote-pricing.ts         # Public quote defaults, normalization, and estimate math
     └── services.ts              # ServiceLayer.logEvent() → Supabase audit (only thing here)
 
 __tests__/
@@ -166,6 +167,7 @@ CANCELLED     → SCHEDULED  (reschedule)
 ### Data Access
 
 - **Public**: GET jobs where status is `INVOICED`, `UNPAID`, or `PAID` only (UNPAID included so overdue customers — flagged by the reminder cron — can still load and pay their invoice; see `firestore.rules`)
+- **Public quote pricing**: GET only `settings/quotePricing`; list and client writes remain blocked. Admin updates use `updateQuotePricing` in `actions.ts`.
 - **Writes**: Server Actions via Firebase Admin SDK (bypasses Firestore rules)
 - **Admin reads**: Client SDK with `onSnapshot` (Firestore rules enforce auth)
 
@@ -355,6 +357,19 @@ NEXT_PUBLIC_GOOGLE_REVIEW_URL  # Google review link; post-job review request onl
   lastUpdated?: Timestamp;
 }
 ```
+
+### `settings/quotePricing`
+
+```typescript
+{
+  services: { title: string; low: number; high: number }[];
+  lastUpdated: Timestamp;
+}
+```
+
+Edit these customer-facing low/high ranges in **Admin → Services**. If the
+document is absent or malformed, the public quote form safely uses the defaults
+from `src/lib/quote-pricing.ts`.
 
 ---
 

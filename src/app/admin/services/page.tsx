@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { createService, updateService, deleteService } from "@/app/actions";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { QuotePricingEditor } from "@/components/admin/QuotePricingEditor";
 
 interface ServiceItem {
   id: string;
@@ -150,7 +151,7 @@ export default function ServicesPage() {
             <div>
               <h1 className="text-3xl font-black">Service Catalog</h1>
               <p className="text-gray-500 mt-1">
-                Manage reusable invoice line items.
+                Manage customer quote ranges and reusable invoice line items.
               </p>
             </div>
             <button
@@ -160,6 +161,8 @@ export default function ServicesPage() {
               <Plus size={18} /> Add Service
             </button>
           </div>
+
+          <QuotePricingEditor />
 
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6 flex items-center gap-3">
             <Search className="text-gray-400" size={20} />

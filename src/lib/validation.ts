@@ -2,6 +2,7 @@
 // Prevents XSS, injection attacks, and malformed data
 
 import { z } from "zod";
+import { QUOTE_SERVICE_TITLES } from "./quote-pricing";
 
 // 🔒 Sanitize strings: remove dangerous characters, trim whitespace
 const sanitizedString = (minLength = 1, maxLength = 500) =>
@@ -202,6 +203,33 @@ export const ServiceSchema = z.object({
   unitPrice: priceSchema,
 });
 
+const QuotePriceRangeSchema = z
+  .object({
+    title: z.enum(QUOTE_SERVICE_TITLES),
+    low: priceSchema,
+    high: priceSchema,
+  })
+  .refine((range) => range.high >= range.low, {
+    message: "Maximum price must be greater than or equal to minimum price",
+    path: ["high"],
+  });
+
+export const QuotePricingSchema = z
+  .array(QuotePriceRangeSchema)
+  .length(
+    QUOTE_SERVICE_TITLES.length,
+    `Exactly ${QUOTE_SERVICE_TITLES.length} quote services are required`,
+  )
+  .superRefine((ranges, context) => {
+    const titles = new Set(ranges.map((range) => range.title));
+    if (titles.size !== QUOTE_SERVICE_TITLES.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Each quote service must appear exactly once",
+      });
+    }
+  });
+
 /**
  * 🔒 Quick invoice creation schema
  */
@@ -251,6 +279,7 @@ export type QuoteInput = z.infer<typeof QuoteSchema>;
 export type JobUpdateInput = z.infer<typeof JobUpdateSchema>;
 export type ClientInput = z.infer<typeof ClientSchema>;
 export type ServiceInput = z.infer<typeof ServiceSchema>;
+export type QuotePricingInput = z.infer<typeof QuotePricingSchema>;
 export type InvoiceCreateInput = z.infer<typeof InvoiceCreateSchema>;
 export type JobStatusInput = z.infer<typeof JobStatusSchema>;
 export type BookingInput = z.infer<typeof BookingSchema>;
@@ -273,6 +302,10 @@ export function validateClient(data: unknown): ClientInput {
 
 export function validateService(data: unknown): ServiceInput {
   return ServiceSchema.parse(data);
+}
+
+export function validateQuotePricing(data: unknown): QuotePricingInput {
+  return QuotePricingSchema.parse(data);
 }
 
 export function validateInvoiceCreate(data: unknown): InvoiceCreateInput {

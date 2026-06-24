@@ -21,7 +21,8 @@ import ReviewRequestEmail from "@/components/email/ReviewRequestEmail";
 import CustomMessageEmail from "@/components/email/CustomMessageEmail";
 import { computeInvoiceTotals, getDueDate } from "@/lib/invoice";
 import { lookupPromo } from "@/lib/promos";
-import { estimateForServices } from "@/app/quote/quote-options";
+import { estimateForServices } from "@/lib/quote-pricing";
+import { loadQuoteServiceOptions } from "@/lib/server/quote-pricing";
 import {
   BUSINESS,
   INVOICE_NUMBER_START,
@@ -47,6 +48,7 @@ import {
   validateBooking,
   validatePaymentMethod,
   validateService,
+  validateQuotePricing,
 } from "@/lib/validation";
 import { enforceRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { isValidTransition, JOB_WORKFLOW } from "@/lib/fsm_logic";
@@ -240,7 +242,8 @@ export async function submitQuote(formData: unknown) {
     // Recompute the ballpark estimate server-side from the saved service titles
     // (never trust a client-sent number). titles = the part before " | ".
     const serviceTitles = service.split(" | ")[0].split(",");
-    const estimate = estimateForServices(serviceTitles);
+    const quoteServiceOptions = await loadQuoteServiceOptions();
+    const estimate = estimateForServices(serviceTitles, quoteServiceOptions);
 
     let clientId: string;
     const q = await adminDb
@@ -478,6 +481,25 @@ export async function deleteService(id: string) {
     return { success: true };
   } catch (error) {
     return handleServerActionError(error, "deleteService");
+  }
+}
+
+export async function updateQuotePricing(pricingData: unknown) {
+  try {
+    await requireAdmin();
+    const services = validateQuotePricing(pricingData);
+    await adminDb.collection("settings").doc("quotePricing").set(
+      {
+        services,
+        lastUpdated: Timestamp.now(),
+      },
+      { merge: true },
+    );
+    revalidatePath("/admin/services");
+    revalidatePath("/quote");
+    return { success: true };
+  } catch (error) {
+    return handleServerActionError(error, "updateQuotePricing");
   }
 }
 

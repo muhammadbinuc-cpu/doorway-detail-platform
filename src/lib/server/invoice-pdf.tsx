@@ -4,7 +4,11 @@ import "server-only";
 
 import { renderToBuffer } from "@react-pdf/renderer";
 import InvoicePdf from "@/components/invoice/InvoicePdf";
-import { computeInvoiceTotals, getDueDate } from "@/lib/invoice";
+import {
+  computeInvoiceTotals,
+  getDueDate,
+  type InvoiceJobLike,
+} from "@/lib/invoice";
 import { BUSINESS, formatInvoiceNumber } from "@/lib/business";
 
 const fmtDate = (d: Date) =>
@@ -24,9 +28,17 @@ function toDate(v: unknown): Date | null {
   return null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface InvoicePdfJob extends InvoiceJobLike {
+  invoicedAt?: unknown;
+  invoiceNumber?: number;
+  name?: string;
+  address?: string;
+  status?: string;
+  invoiceNotes?: string;
+}
+
 export async function renderInvoicePdf(
-  job: any,
+  job: InvoicePdfJob,
   jobId: string,
 ): Promise<Buffer> {
   const totals = computeInvoiceTotals(job);

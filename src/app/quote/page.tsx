@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -20,11 +21,15 @@ import { BrandMark } from "../brand-mark";
 import { QuoteIntro, QuoteSuccess } from "./quote-panels";
 import {
   buildServiceSummary,
-  serviceOptions,
   FULL_EXTERIOR,
   estimateForServices,
 } from "./quote-options";
 import { lookupPromo } from "@/lib/promos";
+import { db } from "@/lib/firebase";
+import {
+  getDefaultQuoteServiceOptions,
+  normalizeQuoteServiceOptions,
+} from "@/lib/quote-pricing";
 
 export default function QuotePage() {
   const [step, setStep] = useState(1);
@@ -35,6 +40,9 @@ export default function QuotePage() {
   const [notes, setNotes] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredWindow, setPreferredWindow] = useState("");
+  const [serviceOptions, setServiceOptions] = useState(() =>
+    getDefaultQuoteServiceOptions(),
+  );
 
   const [formData, setFormData] = useState({
     name: "",
@@ -62,11 +70,26 @@ export default function QuotePage() {
     if (s) setSrc(s);
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "settings", "quotePricing"),
+      (snapshot) =>
+        setServiceOptions(
+          normalizeQuoteServiceOptions(snapshot.data()?.services),
+        ),
+      (error) => {
+        console.warn("Using default quote pricing:", error);
+        setServiceOptions(getDefaultQuoteServiceOptions());
+      },
+    );
+    return unsubscribe;
+  }, []);
+
   // Validate the URL promo against the real promo table (null if unknown).
   const activePromo = lookupPromo(promo);
 
   // Live ballpark estimate from the selected services.
-  const estimate = estimateForServices(selectedServices);
+  const estimate = estimateForServices(selectedServices, serviceOptions);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
