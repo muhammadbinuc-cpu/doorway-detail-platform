@@ -319,6 +319,8 @@ NEXT_PUBLIC_GOOGLE_REVIEW_URL  # Google review link; post-job review request onl
   promoCode?: string;       // validated promo (see src/lib/promos.ts)
   promoDiscount?: number;   // $ discount from the promo; auto-pre-fills the invoice discount field
   source?: string;          // campaign attribution (?src=)
+  estimateLow?: number;     // ballpark estimate shown to the customer (recomputed server-side from service titles)
+  estimateHigh?: number;
   appointmentReminderSent?: boolean;  // set by the appointment-reminder cron; reset to false on (re)booking
   appointmentReminderAt?: Timestamp;
   reviewRequestSent?: boolean;        // set once a review request goes out on → COMPLETED

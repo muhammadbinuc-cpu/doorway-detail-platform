@@ -22,6 +22,7 @@ import {
   buildServiceSummary,
   serviceOptions,
   FULL_EXTERIOR,
+  estimateForServices,
 } from "./quote-options";
 import { lookupPromo } from "@/lib/promos";
 
@@ -63,6 +64,9 @@ export default function QuotePage() {
 
   // Validate the URL promo against the real promo table (null if unknown).
   const activePromo = lookupPromo(promo);
+
+  // Live ballpark estimate from the selected services.
+  const estimate = estimateForServices(selectedServices);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -354,6 +358,21 @@ export default function QuotePage() {
                       </p>
                     )}
                   </div>
+
+                  {estimate && (
+                    <div className="rounded-lg border-2 border-[#C9A227]/40 bg-[#C9A227]/5 px-4 py-3">
+                      <p className="text-xs font-black uppercase tracking-wide text-[#6B5010]">
+                        Ballpark estimate
+                      </p>
+                      <p className="mt-1 text-2xl font-black text-black">
+                        ${estimate.low} – ${estimate.high}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-black/55">
+                        A rough range to set expectations. We confirm your exact
+                        price after a quick review of the property.
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="mb-2 block text-sm font-black text-black/65">

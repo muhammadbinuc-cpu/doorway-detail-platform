@@ -21,6 +21,7 @@ import ReviewRequestEmail from "@/components/email/ReviewRequestEmail";
 import CustomMessageEmail from "@/components/email/CustomMessageEmail";
 import { computeInvoiceTotals, getDueDate } from "@/lib/invoice";
 import { lookupPromo } from "@/lib/promos";
+import { estimateForServices } from "@/app/quote/quote-options";
 import {
   BUSINESS,
   INVOICE_NUMBER_START,
@@ -236,6 +237,11 @@ export async function submitQuote(formData: unknown) {
     // a discount. promo is null for unknown/empty codes.
     const promo = lookupPromo(promoCode);
 
+    // Recompute the ballpark estimate server-side from the saved service titles
+    // (never trust a client-sent number). titles = the part before " | ".
+    const serviceTitles = service.split(" | ")[0].split(",");
+    const estimate = estimateForServices(serviceTitles);
+
     let clientId: string;
     const q = await adminDb
       .collection("clients")
@@ -281,6 +287,10 @@ export async function submitQuote(formData: unknown) {
         ? { promoCode: promo.code, promoDiscount: promo.discount }
         : {}),
       ...(source ? { source } : {}),
+      // Ballpark estimate shown to the customer (for the owner's reference).
+      ...(estimate
+        ? { estimateLow: estimate.low, estimateHigh: estimate.high }
+        : {}),
       createdAt: Timestamp.now(),
     });
 

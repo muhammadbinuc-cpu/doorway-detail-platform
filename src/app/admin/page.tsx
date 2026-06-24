@@ -84,6 +84,8 @@ interface Job {
   details?: string;
   promoCode?: string;
   promoDiscount?: number;
+  estimateLow?: number;
+  estimateHigh?: number;
 }
 
 // Default clock time we pre-fill the scheduler with for each requested window.
@@ -447,6 +449,11 @@ export default function AdminPage() {
                       <div className="text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded w-fit">
                         Promo: {job.promoCode}
                         {job.promoDiscount ? ` (−$${job.promoDiscount})` : ""}
+                      </div>
+                    )}
+                    {job.estimateLow != null && job.estimateHigh != null && (
+                      <div className="text-xs font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded w-fit">
+                        Est. shown: ${job.estimateLow}–${job.estimateHigh}
                       </div>
                     )}
                     {job.details && (
