@@ -7,7 +7,8 @@ import PaymentReceiptEmail from "@/components/email/PaymentReceiptEmail";
 import { computeInvoiceTotals } from "@/lib/invoice";
 import { BUSINESS, formatInvoiceNumber } from "@/lib/business";
 import { ServiceLayer } from "@/lib/services";
-import { sendMail } from "@/lib/server/mailer";
+import { sendMail, type SendMailResult } from "@/lib/server/mailer";
+import { recordEmailStatus } from "@/lib/server/email-status";
 
 const METHOD_LABEL: Record<string, string> = {
   etransfer: "E-transfer",
@@ -18,12 +19,16 @@ const METHOD_LABEL: Record<string, string> = {
 /**
  * Email a paid-in-full receipt to the customer. Reads the (already-updated) job,
  * so call this AFTER the job has been marked PAID. Safe to call from anywhere —
- * a missing email/key or send failure is swallowed.
+ * never throws; returns the send result so callers can surface a warning.
  */
-export async function sendPaymentReceipt(jobId: string): Promise<void> {
+export async function sendPaymentReceipt(
+  jobId: string,
+): Promise<SendMailResult> {
   try {
-    const job = (await adminDb.collection("jobs").doc(jobId).get()).data();
-    if (!job?.email) return;
+    const jobRef = adminDb.collection("jobs").doc(jobId);
+    const job = (await jobRef.get()).data();
+    if (!job?.email)
+      return { ok: false, error: "No customer email on the job" };
 
     const amount =
       typeof job.amountPaid === "number"
@@ -51,7 +56,10 @@ export async function sendPaymentReceipt(jobId: string): Promise<void> {
     });
     if (!result.ok)
       console.error("Payment receipt failed (non-blocking):", result.error);
+    await recordEmailStatus(jobRef, result);
+    return result;
   } catch (e) {
     console.error("Payment receipt failed (non-blocking):", e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }

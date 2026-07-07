@@ -1,6 +1,7 @@
 "use client";
 
 import { Phone, Star, Quote } from "lucide-react";
+import { BUSINESS } from "@/lib/business";
 
 const gold = "#C9A227";
 const dGold = "#6B5010";
@@ -188,6 +189,18 @@ export function Testimonials() {
               </figure>
             ))}
           </div>
+        )}
+
+        {BUSINESS.reviewUrl && (
+          <a
+            href={BUSINESS.reviewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-8 inline-flex items-center gap-2 font-bold text-black hover:underline"
+          >
+            <Star size={16} fill="currentColor" style={{ color: gold }} />
+            Read our reviews on Google
+          </a>
         )}
       </div>
     </section>

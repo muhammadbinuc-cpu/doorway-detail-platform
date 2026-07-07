@@ -27,6 +27,24 @@ export const PAYMENT_TERMS_DAYS = 14;
 // First invoice reads #1001 (looks established), counter is seeded at this value.
 export const INVOICE_NUMBER_START = 1000;
 
+// Quotes get their own counter and a Q- prefix so a quote is never mistaken
+// for an invoice. First quote reads Q-1001.
+export const QUOTE_NUMBER_START = 1000;
+
+// A quote is honoured for this many days after it's sent.
+export const QUOTE_VALID_DAYS = 30;
+
+/** Format a quote number for display (e.g. "Q-1001"; id-derived fallback before assignment). */
+export function formatQuoteNumber(
+  quoteNumber: number | undefined | null,
+  jobId: string,
+): string {
+  if (typeof quoteNumber === "number" && quoteNumber > 0) {
+    return `Q-${quoteNumber}`;
+  }
+  return `Q-${jobId.slice(0, 6).toUpperCase()}`;
+}
+
 /**
  * Format an invoice number for display.
  * Uses the real sequential number once assigned (e.g. "#1001"); otherwise

@@ -2,6 +2,9 @@ import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { LineItem } from "@/lib/invoice";
 
 export interface InvoicePdfProps {
+  // "QUOTE" renders the same document with quote wording: "Prepared For",
+  // "Valid until" instead of a due date, and no payment framing.
+  docType?: "INVOICE" | "QUOTE";
   businessName: string;
   businessAddress: string;
   businessPhone: string;
@@ -83,27 +86,34 @@ const styles = StyleSheet.create({
 });
 
 export default function InvoicePdf(p: InvoicePdfProps) {
+  const isQuote = p.docType === "QUOTE";
   return (
-    <Document title={`Invoice ${p.invoiceLabel}`}>
+    <Document title={`${isQuote ? "Quote" : "Invoice"} ${p.invoiceLabel}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <Text style={styles.brand}>
             DOORWAY <Text style={styles.brandGold}>DETAIL</Text>
           </Text>
-          <Text style={styles.sub}>OFFICIAL INVOICE</Text>
+          <Text style={styles.sub}>
+            {isQuote ? "QUOTE — NOT A BILL" : "OFFICIAL INVOICE"}
+          </Text>
         </View>
 
         <View style={[styles.row, styles.block]}>
           <View>
-            <Text style={styles.label}>Billed To</Text>
+            <Text style={styles.label}>
+              {isQuote ? "Prepared For" : "Billed To"}
+            </Text>
             <Text style={styles.bold}>{p.clientName}</Text>
             <Text style={styles.muted}>{p.clientAddress}</Text>
           </View>
           <View>
-            <Text style={styles.label}>Invoice</Text>
+            <Text style={styles.label}>{isQuote ? "Quote" : "Invoice"}</Text>
             <Text style={styles.bold}>{p.invoiceLabel}</Text>
             <Text style={styles.muted}>Issued {p.issuedDate}</Text>
-            <Text style={styles.muted}>Due {p.dueDate}</Text>
+            <Text style={styles.muted}>
+              {isQuote ? "Valid until" : "Due"} {p.dueDate}
+            </Text>
             {p.status === "PAID" && (
               <Text style={styles.paidBadge}>PAID IN FULL</Text>
             )}
@@ -148,7 +158,9 @@ export default function InvoicePdf(p: InvoicePdfProps) {
           </View>
           <View style={styles.totalRow}>
             <Text style={styles.totalText}>
-              Total {p.status === "PAID" ? "Paid" : "Due"}
+              {isQuote
+                ? "Quoted Total"
+                : `Total ${p.status === "PAID" ? "Paid" : "Due"}`}
             </Text>
             <Text style={[styles.totalText, styles.gold]}>
               ${p.total.toFixed(2)}

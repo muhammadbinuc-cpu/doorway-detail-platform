@@ -39,6 +39,7 @@ import {
   confirmBooking,
   updateJobStatus,
   emailInvoice,
+  emailQuote,
   updateJobDetails,
   sendOnMyWay,
   createRecurringJob,
@@ -47,7 +48,11 @@ import {
 } from "../actions";
 import { JOB_WORKFLOW } from "@/lib/fsm_logic";
 import { statusLabel } from "@/lib/job-status";
-import { formatInvoiceNumber, BUSINESS } from "@/lib/business";
+import {
+  formatInvoiceNumber,
+  formatQuoteNumber,
+  BUSINESS,
+} from "@/lib/business";
 import { computeInvoiceTotals, getDueDate, type LineItem } from "@/lib/invoice";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
@@ -55,6 +60,8 @@ import {
   type CatalogService,
 } from "@/components/admin/LineItemsEditor";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { EmailStatusBadge } from "@/components/admin/EmailStatusBadge";
+import { NumberField } from "@/components/admin/NumberField";
 
 interface Job {
   id: string;
@@ -64,6 +71,7 @@ interface Job {
   phone: string;
   status:
     | "LEAD_RECEIVED"
+    | "QUOTE_SENT"
     | "SCHEDULED"
     | "COMPLETED"
     | "INVOICED"
@@ -86,6 +94,11 @@ interface Job {
   promoDiscount?: number;
   estimateLow?: number;
   estimateHigh?: number;
+  lastEmailStatus?: "sent" | "failed";
+  lastEmailAt?: { seconds?: number };
+  lastEmailError?: string;
+  quoteNumber?: number;
+  quoteAcceptedAt?: { seconds?: number };
 }
 
 // Default clock time we pre-fill the scheduler with for each requested window.
@@ -192,15 +205,15 @@ export default function AdminPage() {
     };
   }, [router]);
 
+  // Real invoice math (line items + discount + tax), not the raw price field.
+  const jobTotal = (job: Job) => computeInvoiceTotals(job).total;
   const totalRevenue = jobs.reduce(
     (acc, job) =>
       acc +
-      (job.status === "COMPLETED" || job.status === "PAID"
-        ? job.price || 0
-        : 0),
+      (job.status === "COMPLETED" || job.status === "PAID" ? jobTotal(job) : 0),
     0,
   );
-  const potentialRevenue = jobs.reduce((acc, job) => acc + (job.price || 0), 0);
+  const potentialRevenue = jobs.reduce((acc, job) => acc + jobTotal(job), 0);
   const activeJobs = jobs.filter(
     (j) => j.status !== "COMPLETED" && j.status !== "PAID",
   ).length;
@@ -213,7 +226,7 @@ export default function AdminPage() {
       name: "Scheduled",
       amount: jobs
         .filter((j) => j.status === "SCHEDULED")
-        .reduce((acc, j) => acc + (j.price || 0), 0),
+        .reduce((acc, j) => acc + jobTotal(j), 0),
     },
     { name: "Completed", amount: totalRevenue },
   ];
@@ -243,6 +256,56 @@ export default function AdminPage() {
   };
   const handlePrice = async (id: string, val: string) => {
     await updateJobDetails(id, { price: parseFloat(val) });
+  };
+  // Requested services arrive as "Window Cleaning, Gutter Cleaning | meta".
+  // Match each one against the catalog so an unpriced lead opens the modal
+  // with line items already filled in.
+  const prefillLineItems = (service: string): LineItem[] => {
+    const names = (service || "")
+      .split("|")[0]
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return names.map((name) => {
+      const match = catalogServices.find(
+        (c) =>
+          c.name.toLowerCase() === name.toLowerCase() ||
+          c.name.toLowerCase().startsWith(name.toLowerCase()) ||
+          name.toLowerCase().startsWith(c.name.toLowerCase()),
+      );
+      return {
+        description: name,
+        quantity: 1,
+        unitPrice: match?.unitPrice ?? 0,
+      };
+    });
+  };
+  const openPricingModal = (job: Job) => {
+    setEditingJob(job);
+    setEditForm({
+      price: job.price || 0,
+      // Auto-apply a validated promo discount the
+      // first time (respects an explicit 0 once set).
+      discount: job.discount ?? job.promoDiscount ?? 0,
+      taxRate: job.taxRate || 0,
+      invoiceNotes: job.invoiceNotes || "",
+    });
+    const hasItemized = !!job.lineItems && job.lineItems.length > 0;
+    const unpriced = !hasItemized && !job.price;
+    setEditLineItems(
+      hasItemized
+        ? (job.lineItems ?? []).map((li) => ({ ...li }))
+        : unpriced
+          ? prefillLineItems(job.service)
+          : [],
+    );
+    setEditInvoiceItems(
+      job.invoiceItems && job.invoiceItems.length > 0
+        ? [...job.invoiceItems]
+        : [],
+    );
+    setInvoiceMode(hasItemized || unpriced ? "itemized" : "lump");
+    setShowSettingsModal(true);
   };
   // Build the invoice-details payload from the modal's current edits.
   // The two modes are mutually exclusive in storage: itemized writes priced
@@ -277,9 +340,30 @@ export default function AdminPage() {
     )
       return;
     const res = await emailInvoice(id);
-    if (res.success) toast.success("Invoice sent");
-    else toast.error(errText(res));
+    if (!res.success) return toast.error(errText(res));
+    if ("deliveryWarning" in res && res.deliveryWarning)
+      toast.warning(res.deliveryWarning as string);
+    else toast.success("Invoice sent");
   };
+  const handleSendQuote = async (id: string, resend: boolean) => {
+    if (
+      !(await confirm({
+        message: resend
+          ? "Re-send this quote to the customer?"
+          : "Send this quote to the customer? They'll get an email with an accept link.",
+        confirmText: "Send quote",
+      }))
+    )
+      return;
+    const res = await emailQuote(id);
+    if (!res.success) return toast.error(errText(res));
+    if ("deliveryWarning" in res && res.deliveryWarning)
+      toast.warning(res.deliveryWarning as string);
+    else toast.success("Quote sent");
+  };
+  // Leads and quoted jobs deal in quotes; everything later deals in invoices.
+  const isQuoteStage = (job: Job) =>
+    job.status === "LEAD_RECEIVED" || job.status === "QUOTE_SENT";
   const handleOnMyWay = async (id: string) => {
     if (
       !(await confirm({
@@ -430,6 +514,21 @@ export default function AdminPage() {
                           {formatInvoiceNumber(job.invoiceNumber, job.id)}
                         </span>
                       )}
+                      {!job.invoiceNumber && job.quoteNumber && (
+                        <span className="px-2 py-1 text-xs font-mono font-bold text-gray-400 bg-gray-50 rounded">
+                          Quote {formatQuoteNumber(job.quoteNumber, job.id)}
+                        </span>
+                      )}
+                      {job.status === "QUOTE_SENT" && job.quoteAcceptedAt && (
+                        <span className="px-2 py-1 text-xs font-bold text-green-700 bg-green-50 rounded">
+                          Accepted ✓ — schedule it
+                        </span>
+                      )}
+                      <EmailStatusBadge
+                        status={job.lastEmailStatus}
+                        at={job.lastEmailAt}
+                        error={job.lastEmailError}
+                      />
                     </div>
                     <div className="text-sm text-gray-500 flex gap-4">
                       <span className="flex items-center gap-1">
@@ -465,61 +564,62 @@ export default function AdminPage() {
                       <span className="font-bold text-gray-400">$</span>
                       <input
                         type="number"
-                        defaultValue={job.price}
+                        defaultValue={job.price || ""}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
                         onBlur={(e) => handlePrice(job.id, e.target.value)}
                         className="bg-transparent font-bold w-20 outline-none"
                       />
-                      {(job.price ||
-                        (job.lineItems && job.lineItems.length > 0)) && (
-                        <div className="flex items-center gap-2 border-l pl-2 border-gray-300">
-                          <a
-                            href={`/invoice/${job.id}`}
-                            target="_blank"
-                            className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline"
-                          >
-                            <FileText size={12} /> View
-                          </a>
-                          <button
-                            onClick={() => handleSendInvoice(job.id)}
-                            className="text-blue-500 text-xs font-bold hover:underline"
-                          >
-                            Send
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingJob(job);
-                              setEditForm({
-                                price: job.price || 0,
-                                // Auto-apply a validated promo discount the
-                                // first time (respects an explicit 0 once set).
-                                discount:
-                                  job.discount ?? job.promoDiscount ?? 0,
-                                taxRate: job.taxRate || 0,
-                                invoiceNotes: job.invoiceNotes || "",
-                              });
-                              const hasItemized =
-                                !!job.lineItems && job.lineItems.length > 0;
-                              setEditLineItems(
-                                hasItemized
-                                  ? (job.lineItems ?? []).map((li) => ({
-                                      ...li,
-                                    }))
-                                  : [],
-                              );
-                              setEditInvoiceItems(
-                                job.invoiceItems && job.invoiceItems.length > 0
-                                  ? [...job.invoiceItems]
-                                  : [],
-                              );
-                              setInvoiceMode(hasItemized ? "itemized" : "lump");
-                              setShowSettingsModal(true);
-                            }}
-                            className="text-gray-400 hover:text-black transition-colors"
-                          >
-                            <Settings size={12} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 border-l pl-2 border-gray-300">
+                        {(job.price ||
+                          (job.lineItems && job.lineItems.length > 0)) && (
+                          <>
+                            <a
+                              href={
+                                job.status === "QUOTE_SENT"
+                                  ? `/quote/${job.id}`
+                                  : `/invoice/${job.id}`
+                              }
+                              target="_blank"
+                              className="text-[#D4AF37] text-xs font-bold flex items-center gap-1 hover:underline"
+                            >
+                              <FileText size={12} /> View
+                            </a>
+                            {isQuoteStage(job) ? (
+                              <button
+                                onClick={() =>
+                                  handleSendQuote(
+                                    job.id,
+                                    job.status === "QUOTE_SENT",
+                                  )
+                                }
+                                className="text-purple-600 text-xs font-bold hover:underline"
+                              >
+                                {job.status === "QUOTE_SENT"
+                                  ? "Resend Quote"
+                                  : "Send Quote"}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleSendInvoice(job.id)}
+                                className="text-blue-500 text-xs font-bold hover:underline"
+                              >
+                                Send Invoice
+                              </button>
+                            )}
+                          </>
+                        )}
+                        <button
+                          onClick={() => openPricingModal(job)}
+                          className="text-gray-400 hover:text-black transition-colors flex items-center gap-1 text-xs font-bold"
+                        >
+                          <Settings size={12} />
+                          {!job.price &&
+                          (!job.lineItems || job.lineItems.length === 0)
+                            ? "Price this job"
+                            : null}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 justify-center border-l pl-6 w-full md:w-40">
@@ -603,9 +703,10 @@ export default function AdminPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-3xl p-8 max-w-4xl w-full shadow-2xl"
           >
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-2">
               <h3 className="font-black text-xl">
-                Invoice — Edit &amp; Preview
+                {isQuoteStage(editingJob) ? "Quote" : "Invoice"} — Edit &amp;
+                Preview
               </h3>
               <button
                 onClick={() => setShowSettingsModal(false)}
@@ -614,6 +715,13 @@ export default function AdminPage() {
                 <X size={24} />
               </button>
             </div>
+            {editingJob.estimateLow != null &&
+              editingJob.estimateHigh != null && (
+                <p className="text-xs font-bold text-[#6B5010] bg-[#D4AF37]/10 px-2 py-1 rounded w-fit mb-4">
+                  Customer saw a ${editingJob.estimateLow}–$
+                  {editingJob.estimateHigh} ballpark on the quote form
+                </p>
+              )}
             <div className="grid md:grid-cols-2 gap-8 max-h-[72vh] overflow-auto">
               <div className="space-y-4 pr-1">
                 {/* PRICING STYLE TOGGLE */}
@@ -654,14 +762,10 @@ export default function AdminPage() {
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
                         Total Price ($)
                       </label>
-                      <input
-                        type="number"
+                      <NumberField
                         value={editForm.price}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            price: parseFloat(e.target.value) || 0,
-                          })
+                        onChange={(price) =>
+                          setEditForm({ ...editForm, price })
                         }
                         className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
                       />
@@ -737,14 +841,10 @@ export default function AdminPage() {
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
                     Discount Amount ($)
                   </label>
-                  <input
-                    type="number"
+                  <NumberField
                     value={editForm.discount}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        discount: parseFloat(e.target.value) || 0,
-                      })
+                    onChange={(discount) =>
+                      setEditForm({ ...editForm, discount })
                     }
                     className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
                   />
@@ -753,14 +853,11 @@ export default function AdminPage() {
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
                     Tax Rate (%)
                   </label>
-                  <input
-                    type="number"
+                  <NumberField
                     value={editForm.taxRate}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        taxRate: parseFloat(e.target.value) || 0,
-                      })
+                    placeholder="13"
+                    onChange={(taxRate) =>
+                      setEditForm({ ...editForm, taxRate })
                     }
                     className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
                   />
@@ -798,9 +895,10 @@ export default function AdminPage() {
                   </button>
                   <button
                     onClick={async () => {
+                      const quoting = isQuoteStage(editingJob);
                       if (
                         !(await confirm({
-                          message: `Email this invoice to ${editingJob.name || "the customer"}?`,
+                          message: `Email this ${quoting ? "quote" : "invoice"} to ${editingJob.name || "the customer"}?`,
                           confirmText: "Save & Send",
                         }))
                       )
@@ -813,19 +911,23 @@ export default function AdminPage() {
                         toast.error(errText(save));
                         return;
                       }
-                      const res = await emailInvoice(editingJob.id);
+                      const res = quoting
+                        ? await emailQuote(editingJob.id)
+                        : await emailInvoice(editingJob.id);
                       if (!res.success) {
                         toast.error(errText(res));
                         return;
                       }
                       if ("deliveryWarning" in res && res.deliveryWarning)
                         toast.warning(res.deliveryWarning as string);
-                      else toast.success("Invoice sent");
+                      else
+                        toast.success(quoting ? "Quote sent" : "Invoice sent");
                       setShowSettingsModal(false);
                     }}
                     className="flex-1 bg-black text-white p-4 rounded-xl font-bold hover:bg-[#D4AF37] hover:text-black transition-all"
                   >
-                    Save &amp; Send
+                    Save &amp; Send{" "}
+                    {isQuoteStage(editingJob) ? "Quote" : "Invoice"}
                   </button>
                 </div>
               </div>

@@ -4,7 +4,8 @@
 // Prevents invalid state transitions (e.g., LEAD → PAID without invoicing)
 
 export const JOB_WORKFLOW: Record<string, string[]> = {
-  LEAD_RECEIVED: ["SCHEDULED", "LOST", "CANCELLED"],
+  LEAD_RECEIVED: ["QUOTE_SENT", "SCHEDULED", "LOST", "CANCELLED"],
+  QUOTE_SENT: ["SCHEDULED", "LOST", "CANCELLED"], // customer accepted (or declined) the quote
   SCHEDULED: ["COMPLETED", "CANCELLED"], // ✅ Can complete or cancel
   COMPLETED: ["INVOICED"], // ✅ Must invoice after completion
   INVOICED: ["PAID", "UNPAID", "CANCELLED"], // CANCELLED = voided invoice

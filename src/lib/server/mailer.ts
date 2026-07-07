@@ -21,6 +21,11 @@ function getTransport(): nodemailer.Transporter | null {
   _transport = nodemailer.createTransport({
     service: "gmail",
     auth: { user, pass },
+    // Serverless: a hung SMTP handshake must fail fast, not eat the
+    // whole function timeout while the admin stares at a spinner.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
   return _transport;
 }
@@ -60,6 +65,7 @@ export async function sendMail({
     const text = await render(react, { plainText: true });
     await transport.sendMail({
       from: MAIL_FROM,
+      replyTo: MAIL_FROM,
       to,
       subject,
       html,

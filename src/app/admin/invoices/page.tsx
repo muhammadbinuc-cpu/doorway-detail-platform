@@ -46,6 +46,8 @@ import {
   type CatalogService,
 } from "@/components/admin/LineItemsEditor";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { EmailStatusBadge } from "@/components/admin/EmailStatusBadge";
+import { NumberField } from "@/components/admin/NumberField";
 
 interface InvoiceJob {
   id: string;
@@ -60,6 +62,9 @@ interface InvoiceJob {
   invoicedAt?: { seconds?: number };
   paymentMethod?: string;
   reminderCount?: number;
+  lastEmailStatus?: "sent" | "failed";
+  lastEmailAt?: { seconds?: number };
+  lastEmailError?: string;
 }
 
 interface ClientOption {
@@ -157,7 +162,10 @@ export default function InvoicesPage() {
               console.error("Firestore Clients Error:", error);
           },
         );
-        const servicesQuery = query(collection(db, "services"), orderBy("name"));
+        const servicesQuery = query(
+          collection(db, "services"),
+          orderBy("name"),
+        );
         unsubscribeServices = onSnapshot(
           servicesQuery,
           (snap) => {
@@ -194,9 +202,15 @@ export default function InvoicesPage() {
   const filteredClients = clients.filter((client) => {
     const q = clientSearch.toLowerCase();
     return (
-      String(client.name || "").toLowerCase().includes(q) ||
-      String(client.email || "").toLowerCase().includes(q) ||
-      String(client.address || "").toLowerCase().includes(q)
+      String(client.name || "")
+        .toLowerCase()
+        .includes(q) ||
+      String(client.email || "")
+        .toLowerCase()
+        .includes(q) ||
+      String(client.address || "")
+        .toLowerCase()
+        .includes(q)
     );
   });
   const cleanCreateLineItems = () =>
@@ -284,8 +298,10 @@ export default function InvoicesPage() {
     setPayingId(id);
     const res = await markInvoicePaid(id, method);
     setPayingId(null);
-    if (res.success) toast.success("Marked paid");
-    else toast.error(errText(res));
+    if (!res.success) return toast.error(errText(res));
+    const warn = warnText(res);
+    if (warn) toast.warning(warn);
+    else toast.success("Marked paid");
   };
 
   const resetCreateInvoice = () => {
@@ -506,6 +522,11 @@ export default function InvoicesPage() {
                               {job.reminderCount === 1 ? "" : "s"} sent
                             </span>
                           )}
+                          <EmailStatusBadge
+                            status={job.lastEmailStatus}
+                            at={job.lastEmailAt}
+                            error={job.lastEmailError}
+                          />
                         </div>
                       </td>
                       <td className="p-5">
@@ -684,15 +705,11 @@ export default function InvoicesPage() {
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
                       Discount Amount ($)
                     </label>
-                    <input
-                      type="number"
+                    <NumberField
                       min={0}
                       value={createForm.discount}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          discount: parseFloat(e.target.value) || 0,
-                        })
+                      onChange={(discount) =>
+                        setCreateForm({ ...createForm, discount })
                       }
                       className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
                     />
@@ -701,15 +718,12 @@ export default function InvoicesPage() {
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
                       Tax Rate (%)
                     </label>
-                    <input
-                      type="number"
+                    <NumberField
                       min={0}
                       value={createForm.taxRate}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          taxRate: parseFloat(e.target.value) || 0,
-                        })
+                      placeholder="13"
+                      onChange={(taxRate) =>
+                        setCreateForm({ ...createForm, taxRate })
                       }
                       className="w-full bg-gray-50 p-3 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
                     />

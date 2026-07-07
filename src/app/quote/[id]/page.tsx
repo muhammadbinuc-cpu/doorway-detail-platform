@@ -1,35 +1,30 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useParams, useSearchParams } from "next/navigation";
-import {
-  Loader2,
-  CheckCircle,
-  CreditCard,
-  ShieldCheck,
-  Download,
-} from "lucide-react";
+import { useParams } from "next/navigation";
+import { Loader2, CheckCircle, Phone } from "lucide-react";
 import { toast } from "sonner";
-import { createCheckoutSession } from "@/app/actions";
-import { computeInvoiceTotals, getDueDate, type LineItem } from "@/lib/invoice";
-import { BUSINESS, formatInvoiceNumber } from "@/lib/business";
+import { acceptQuote } from "@/app/actions";
+import { computeInvoiceTotals, type LineItem } from "@/lib/invoice";
+import { BUSINESS, formatQuoteNumber } from "@/lib/business";
 
-interface InvoiceJob {
+interface QuoteJob {
   id: string;
   name?: string;
   address?: string;
-  service?: string;
   status?: string;
   price?: number;
   discount?: number;
   taxRate?: number;
   lineItems?: LineItem[];
   invoiceItems?: string[];
-  invoiceNumber?: number;
   invoiceNotes?: string;
-  invoicedAt?: { seconds?: number };
+  quoteNumber?: number;
+  quoteSentAt?: { seconds?: number };
+  quoteValidUntil?: { seconds?: number };
+  quoteAcceptedAt?: { seconds?: number };
 }
 
 const fmtDate = (d: Date) =>
@@ -39,24 +34,41 @@ const fmtDate = (d: Date) =>
     day: "numeric",
   });
 
-function InvoiceView() {
-  const params = useParams();
-  const searchParams = useSearchParams();
-  const id = params?.id as string;
-  const [job, setJob] = useState<InvoiceJob | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
+const toDate = (t?: { seconds?: number }) =>
+  t?.seconds ? new Date(t.seconds * 1000) : null;
 
-  const paymentSuccess = searchParams.get("success") === "true";
-  const paymentCanceled = searchParams.get("canceled") === "true";
+function ContactFooter() {
+  return (
+    <p className="text-gray-500 text-sm mt-4">
+      Questions? Call or text{" "}
+      <a href={`tel:${BUSINESS.phone}`} className="font-bold text-black">
+        {BUSINESS.phone}
+      </a>{" "}
+      or email{" "}
+      <a
+        href={`mailto:${BUSINESS.email}`}
+        className="font-bold text-black break-all"
+      >
+        {BUSINESS.email}
+      </a>
+    </p>
+  );
+}
+
+export default function QuotePage() {
+  const params = useParams();
+  const id = params?.id as string;
+  const [job, setJob] = useState<QuoteJob | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [accepting, setAccepting] = useState(false);
+  const [justAccepted, setJustAccepted] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     const fetchJob = async () => {
       try {
         const snap = await getDoc(doc(db, "jobs", id));
-        if (snap.exists())
-          setJob({ id: snap.id, ...snap.data() } as InvoiceJob);
+        if (snap.exists()) setJob({ id: snap.id, ...snap.data() } as QuoteJob);
       } catch (error) {
         console.error(error);
       } finally {
@@ -66,17 +78,17 @@ function InvoiceView() {
     fetchJob();
   }, [id]);
 
-  const handlePay = async () => {
-    setPaying(true);
-    const result = await createCheckoutSession(id);
-    if (result.success && result.url) {
-      window.location.href = result.url;
+  const handleAccept = async () => {
+    setAccepting(true);
+    const res = await acceptQuote(id);
+    setAccepting(false);
+    if (res.success) {
+      setJustAccepted(true);
     } else {
       toast.error(
-        "Payment couldn't start: " +
-          (("error" in result ? result.error : undefined) || "Unknown error"),
+        ("error" in res ? res.error : undefined) ||
+          "Something went wrong — call or text us instead.",
       );
-      setPaying(false);
     }
   };
 
@@ -86,59 +98,53 @@ function InvoiceView() {
         <Loader2 className="animate-spin text-[#C9A227]" size={48} />
       </div>
     );
-  if (!job)
+
+  if (!job || job.status !== "QUOTE_SENT")
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white p-10 rounded-3xl max-w-md w-full text-center shadow-xl">
-          <h1 className="text-2xl font-black mb-2">Invoice not found</h1>
+          <h1 className="text-2xl font-black mb-2">
+            This quote isn&apos;t available
+          </h1>
           <p className="text-gray-500 text-sm">
-            The link may be out of date. Call or text{" "}
-            <a href={`tel:${BUSINESS.phone}`} className="font-bold text-black">
-              {BUSINESS.phone}
-            </a>{" "}
-            or email{" "}
-            <a
-              href={`mailto:${BUSINESS.email}`}
-              className="font-bold text-black break-all"
-            >
-              {BUSINESS.email}
-            </a>{" "}
-            and we&apos;ll send you a fresh one.
+            It may have already been booked, or the link is out of date.
           </p>
+          <ContactFooter />
         </div>
       </div>
     );
 
   const { lineItems, subtotal, discount, taxRate, taxAmount, total } =
     computeInvoiceTotals(job);
-  const invoicedAt = job.invoicedAt?.seconds
-    ? new Date(job.invoicedAt.seconds * 1000)
-    : null;
-  const dueDate = getDueDate(invoicedAt);
-  const invoiceLabel = formatInvoiceNumber(job.invoiceNumber, job.id);
+  const quoteLabel = formatQuoteNumber(job.quoteNumber, job.id);
+  const sentAt = toDate(job.quoteSentAt);
+  const validUntil = toDate(job.quoteValidUntil);
+  const expired = !!validUntil && validUntil.getTime() < Date.now();
+  const accepted = justAccepted || !!job.quoteAcceptedAt;
 
-  if (job.status === "PAID" || paymentSuccess) {
+  if (accepted) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
-        <div className="bg-white p-10 rounded-3xl max-w-md w-full text-center shadow-2xl animate-scale-up">
+        <div className="bg-white p-10 rounded-3xl max-w-md w-full text-center shadow-2xl">
           <CheckCircle className="w-24 h-24 text-green-500 mx-auto mb-6" />
-          <h1 className="text-3xl font-black mb-2 text-black">PAID IN FULL</h1>
+          <h1 className="text-3xl font-black mb-2 text-black">
+            Quote accepted
+          </h1>
           <p className="text-gray-500 mb-2">
-            Thank you for your business, {job.name}!
+            Thanks, {job.name}! We&apos;ll text you shortly to book a time that
+            works.
           </p>
           <p className="text-gray-400 text-xs font-mono mb-8">
-            Invoice {invoiceLabel}
+            Quote {quoteLabel}
           </p>
           <div className="bg-gray-100 p-4 rounded-xl flex justify-between font-bold text-lg text-black">
-            <span>Total Paid:</span>
+            <span>Quoted total:</span>
             <span>${total.toFixed(2)}</span>
           </div>
-          <a
-            href={`/invoice/${job.id}/pdf`}
-            className="mt-6 inline-flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:text-black transition-colors"
-          >
-            <Download size={16} /> Download PDF copy
-          </a>
+          <p className="text-gray-400 text-xs mt-4">
+            Nothing to pay now — you&apos;re invoiced after the work is done.
+          </p>
+          <ContactFooter />
         </div>
       </div>
     );
@@ -151,8 +157,8 @@ function InvoiceView() {
           <h1 className="text-2xl font-black italic tracking-wider mb-2">
             DOORWAY <span className="text-[#C9A227]">DETAIL</span>
           </h1>
-          <p className="text-gray-400 text-sm font-bold tracking-widest uppercase">
-            Official Invoice
+          <p className="text-[#C9A227] text-sm font-bold tracking-widest uppercase">
+            Your quote — not a bill
           </p>
         </div>
 
@@ -160,20 +166,28 @@ function InvoiceView() {
           <div className="flex justify-between items-start mb-8">
             <div>
               <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wide mb-1">
-                Billed To
+                Prepared for
               </h2>
               <p className="text-xl font-bold">{job.name}</p>
               <p className="text-gray-500">{job.address}</p>
             </div>
             <div className="text-right">
               <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wide mb-1">
-                Invoice
+                Quote
               </h2>
-              <p className="font-mono font-bold text-black">{invoiceLabel}</p>
-              <p className="text-gray-500 text-sm mt-2">
-                Issued {fmtDate(invoicedAt ?? new Date())}
-              </p>
-              <p className="text-gray-500 text-sm">Due {fmtDate(dueDate)}</p>
+              <p className="font-mono font-bold text-black">{quoteLabel}</p>
+              {sentAt && (
+                <p className="text-gray-500 text-sm mt-2">
+                  Sent {fmtDate(sentAt)}
+                </p>
+              )}
+              {validUntil && (
+                <p
+                  className={`text-sm ${expired ? "text-red-600 font-bold" : "text-gray-500"}`}
+                >
+                  Valid until {fmtDate(validUntil)}
+                </p>
+              )}
             </div>
           </div>
 
@@ -232,7 +246,7 @@ function InvoiceView() {
             </div>
 
             <div className="flex justify-between items-center text-xl font-black pt-4 mt-4 border-t border-gray-200">
-              <span>Total Due</span>
+              <span>Quoted total</span>
               <span className="text-[#C9A227]">${total.toFixed(2)}</span>
             </div>
           </div>
@@ -248,71 +262,47 @@ function InvoiceView() {
             </div>
           )}
 
-          {paymentCanceled && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-5 py-4 mb-4 text-sm font-medium">
-              Payment was canceled — no charge was made. You can try again
-              below, or contact us at {BUSINESS.phone} if you ran into trouble.
+          {expired ? (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-5 py-4 text-sm font-medium">
+              This quote has expired. Call or text {BUSINESS.phone} and
+              we&apos;ll get you an updated price — it only takes a minute.
             </div>
+          ) : (
+            <>
+              <button
+                onClick={handleAccept}
+                disabled={accepting}
+                className="w-full bg-[#C9A227] text-black py-5 rounded-xl font-bold text-lg hover:bg-black hover:text-white transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {accepting ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <CheckCircle size={20} />
+                )}
+                Accept quote
+              </button>
+              <p className="text-gray-400 text-xs text-center mt-3">
+                Nothing is charged now. Accepting tells us you&apos;re in —
+                we&apos;ll text you to book a time, and you pay only after the
+                work is done.
+              </p>
+              <a
+                href={`tel:${BUSINESS.phone}`}
+                className="mt-4 w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:text-black transition-colors"
+              >
+                <Phone size={16} /> Questions? Call or text {BUSINESS.phone}
+              </a>
+            </>
           )}
 
-          <button
-            onClick={handlePay}
-            disabled={paying}
-            className="w-full bg-black text-white py-5 rounded-xl font-bold text-lg hover:bg-[#C9A227] hover:text-black transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {paying ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <CreditCard size={20} />
-            )}
-            Pay ${total.toFixed(2)}
-          </button>
-
-          <div className="mt-4 bg-gray-50 rounded-xl px-5 py-4 text-sm text-gray-600 border border-gray-100">
-            <span className="font-bold text-black">Prefer e-transfer?</span>{" "}
-            Send ${total.toFixed(2)} to{" "}
-            <span className="font-bold text-black break-all">
-              {BUSINESS.email}
-            </span>{" "}
-            with invoice {invoiceLabel} in the message — we&apos;ll confirm by
-            text.
-          </div>
-
-          <a
-            href={`/invoice/${job.id}/pdf`}
-            className="mt-4 w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:text-black transition-colors"
-          >
-            <Download size={16} /> Download PDF copy
-          </a>
-
-          <div className="mt-6 flex items-center justify-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-wide">
-            <ShieldCheck size={14} /> Secure Payment Processing
-          </div>
-
-          {/* FROM / BUSINESS INFO */}
           <div className="mt-8 pt-6 border-t border-gray-100 text-center text-xs text-gray-400 leading-relaxed">
             <p className="font-bold text-gray-500">{BUSINESS.name}</p>
             <p>
               {BUSINESS.address} · {BUSINESS.phone}
             </p>
-            {BUSINESS.hstNumber && <p>HST# {BUSINESS.hstNumber}</p>}
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-export default function InvoicePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <Loader2 className="animate-spin text-[#C9A227]" size={48} />
-        </div>
-      }
-    >
-      <InvoiceView />
-    </Suspense>
   );
 }

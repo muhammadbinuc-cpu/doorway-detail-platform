@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import type { LineItem } from "@/lib/invoice";
+import { NumberField } from "@/components/admin/NumberField";
 
 export interface CatalogService {
   id: string;
@@ -101,28 +102,23 @@ export function LineItemsEditor({
               placeholder="Description"
               className="min-w-0 bg-gray-50 p-2 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
             />
-            <input
-              type="number"
+            <NumberField
+              integer
               min={1}
+              emptyValue={1}
+              placeholder="1"
               value={li.quantity}
-              onChange={(e) =>
-                updateLineItem(idx, {
-                  ...li,
-                  quantity: parseInt(e.target.value, 10) || 1,
-                })
+              onChange={(quantity) =>
+                updateLineItem(idx, { ...li, quantity: quantity || 1 })
               }
               className="w-full bg-gray-50 p-2 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
               title="Qty"
             />
-            <input
-              type="number"
+            <NumberField
               min={0}
               value={li.unitPrice}
-              onChange={(e) =>
-                updateLineItem(idx, {
-                  ...li,
-                  unitPrice: parseFloat(e.target.value) || 0,
-                })
+              onChange={(unitPrice) =>
+                updateLineItem(idx, { ...li, unitPrice })
               }
               className="w-full bg-gray-50 p-2 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37]"
               title="Unit price ($)"

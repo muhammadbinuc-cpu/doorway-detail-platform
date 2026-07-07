@@ -26,11 +26,11 @@ const K = "#111111";
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
 export const trustChips = [
-  "Free estimates",
+  "Free written quotes",
   "Specialized crews",
   "Clear updates",
   "No upfront payment",
-  "Insured",
+  "Insured & WSIB covered",
   "GTA + KW service area",
 ];
 
@@ -50,8 +50,8 @@ export const processSteps = [
   },
   {
     icon: MessageCircle,
-    title: "We confirm the scope",
-    text: "Quick call or text to lock the work and timing.",
+    title: "Approve your written quote",
+    text: "We send a fixed price you accept in one click. No surprises later.",
   },
   {
     icon: CalendarCheck,
@@ -86,7 +86,7 @@ export const reassuranceItems = [
 export const faqItems = [
   {
     q: "Are you insured?",
-    a: "Yes. If you need proof of insurance before booking, ask during the quote process and we'll confirm the details.",
+    a: "Yes — we carry liability insurance and WSIB coverage. If you need proof before booking, ask during the quote process and we'll confirm the details.",
   },
   {
     q: "Do I need to be home?",
@@ -102,7 +102,7 @@ export const faqItems = [
   },
   {
     q: "How do you price jobs?",
-    a: "Every property is different, so we quote after reviewing the service, address, access, and any notes you send. Estimates are free and there is no obligation.",
+    a: "Every property is different, so we review the service, address, and access, then send you a written quote with a fixed price. You accept it online in one click — free, no obligation, and the price doesn't change after you approve it.",
   },
   {
     q: "What equipment do you use?",
@@ -129,7 +129,10 @@ export function FaqAccordion() {
   return (
     <div className="space-y-3">
       {faqItems.map((item, i) => (
-        <div key={i} className="overflow-hidden rounded-xl border border-black/10 bg-white">
+        <div
+          key={i}
+          className="overflow-hidden rounded-xl border border-black/10 bg-white"
+        >
           <button
             onClick={() => setOpen(open === i ? null : i)}
             className="flex w-full items-center justify-between px-6 py-4 text-left font-bold text-black transition hover:bg-[#F5F4F0]"
@@ -152,7 +155,9 @@ export function FaqAccordion() {
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.25 }}
               >
-                <p className="px-6 pb-5 text-sm leading-7 text-black/65">{item.a}</p>
+                <p className="px-6 pb-5 text-sm leading-7 text-black/65">
+                  {item.a}
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -172,18 +177,35 @@ const bob = {
 
 // Per-image crop/zoom config: transform is applied to a wrapper so it
 // works independently of Next.js fill internals.
-const CHAR_CONFIG: Record<string, { contain?: boolean; wrapStyle?: React.CSSProperties }> = {
+const CHAR_CONFIG: Record<
+  string,
+  { contain?: boolean; wrapStyle?: React.CSSProperties }
+> = {
   "/workers/landscaping-v3.png": {
     contain: true,
-    wrapStyle: { transform: "scale(1.6) translateY(6%)", transformOrigin: "center top" },
+    wrapStyle: {
+      transform: "scale(1.6) translateY(6%)",
+      transformOrigin: "center top",
+    },
   },
   "/workers/gutter-v3.png": {
     contain: true,
-    wrapStyle: { transform: "scale(1.4) translateX(10%)", transformOrigin: "center center" },
+    wrapStyle: {
+      transform: "scale(1.4) translateX(10%)",
+      transformOrigin: "center center",
+    },
   },
 };
 
-function CharacterImage({ src, alt, priority = false }: { src: string; alt: string; priority?: boolean }) {
+function CharacterImage({
+  src,
+  alt,
+  priority = false,
+}: {
+  src: string;
+  alt: string;
+  priority?: boolean;
+}) {
   const cfg = CHAR_CONFIG[src];
   return (
     <motion.div
@@ -207,19 +229,39 @@ function CharacterImage({ src, alt, priority = false }: { src: string; alt: stri
 }
 
 function WorkerWindowCleaner() {
-  return <CharacterImage src="/workers/window-v3.png" alt="Doorway Detail window cleaning crew member" />;
+  return (
+    <CharacterImage
+      src="/workers/window-v3.png"
+      alt="Doorway Detail window cleaning crew member"
+    />
+  );
 }
 
 function WorkerPressureWasher() {
-  return <CharacterImage src="/workers/pressure-v3.png" alt="Doorway Detail pressure washing crew member" />;
+  return (
+    <CharacterImage
+      src="/workers/pressure-v3.png"
+      alt="Doorway Detail pressure washing crew member"
+    />
+  );
 }
 
 function WorkerLandscaper() {
-  return <CharacterImage src="/workers/landscaping-v3.png" alt="Doorway Detail landscaping crew member" />;
+  return (
+    <CharacterImage
+      src="/workers/landscaping-v3.png"
+      alt="Doorway Detail landscaping crew member"
+    />
+  );
 }
 
 function WorkerGutterCleaner() {
-  return <CharacterImage src="/workers/gutter-v3.png" alt="Doorway Detail gutter cleaning crew member" />;
+  return (
+    <CharacterImage
+      src="/workers/gutter-v3.png"
+      alt="Doorway Detail gutter cleaning crew member"
+    />
+  );
 }
 
 // Team composition for hero + Full Exterior tab — single composite illustration.
@@ -264,7 +306,8 @@ const SERVICES: ServiceEntry[] = [
   },
   {
     title: "Pressure Washing",
-    summary: "Commercial-grade equipment removes years of buildup from hard surfaces.",
+    summary:
+      "Commercial-grade equipment removes years of buildup from hard surfaces.",
     bullets: [
       "Driveways, walkways, and patios",
       "Decks, fences, and siding",
@@ -274,7 +317,8 @@ const SERVICES: ServiceEntry[] = [
   },
   {
     title: "Landscaping",
-    summary: "Tidy exterior details that make the whole property look cared for.",
+    summary:
+      "Tidy exterior details that make the whole property look cared for.",
     bullets: [
       "Weed removal and edge cleanup",
       "Garden beds and seasonal tidy",
@@ -312,7 +356,10 @@ export function ServicesSection() {
     <section id="services" className="scroll-mt-24 px-5 py-20 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-7xl">
         <div className="mb-12">
-          <p className="text-sm font-black uppercase tracking-[0.24em]" style={{ color: dGold }}>
+          <p
+            className="text-sm font-black uppercase tracking-[0.24em]"
+            style={{ color: dGold }}
+          >
             Services
           </p>
           <h2 className="mt-3 max-w-2xl text-4xl font-black text-black sm:text-5xl">
@@ -362,12 +409,23 @@ export function ServicesSection() {
                 className="grid md:grid-cols-[1.15fr_0.85fr]"
               >
                 <div className="flex flex-col justify-center p-7 lg:p-9">
-                  <h3 className="text-3xl font-black text-black lg:text-4xl">{service.title}</h3>
-                  <p className="mt-4 text-base leading-7 text-black/65">{service.summary}</p>
+                  <h3 className="text-3xl font-black text-black lg:text-4xl">
+                    {service.title}
+                  </h3>
+                  <p className="mt-4 text-base leading-7 text-black/65">
+                    {service.summary}
+                  </p>
                   <ul className="mt-6 space-y-3">
                     {service.bullets.map((b) => (
-                      <li key={b} className="flex items-start gap-3 text-sm font-semibold text-black/75">
-                        <CheckCircle2 size={17} className="mt-0.5 shrink-0" style={{ color: dGold }} />
+                      <li
+                        key={b}
+                        className="flex items-start gap-3 text-sm font-semibold text-black/75"
+                      >
+                        <CheckCircle2
+                          size={17}
+                          className="mt-0.5 shrink-0"
+                          style={{ color: dGold }}
+                        />
                         {b}
                       </li>
                     ))}
@@ -395,13 +453,19 @@ export function ServicesSection() {
         >
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em]" style={{ color: gold }}>
+              <p
+                className="text-sm font-black uppercase tracking-[0.22em]"
+                style={{ color: gold }}
+              >
                 Best value
               </p>
-              <h3 className="mt-2 text-2xl font-black">Book the Full Exterior Package</h3>
+              <h3 className="mt-2 text-2xl font-black">
+                Book the Full Exterior Package
+              </h3>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
-                Windows, pressure washing, gutter cleaning, and landscaping in one coordinated visit.
-                We confirm the scope first so the crew shows up prepared.
+                Windows, pressure washing, gutter cleaning, and landscaping in
+                one coordinated visit. We confirm the scope first so the crew
+                shows up prepared.
               </p>
             </div>
             <Link
@@ -433,7 +497,10 @@ export function JobLifecycleAnimation() {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setActive((p) => (p + 1) % LIFECYCLE_STAGES.length), 1800);
+    const t = setInterval(
+      () => setActive((p) => (p + 1) % LIFECYCLE_STAGES.length),
+      1800,
+    );
     return () => clearInterval(t);
   }, []);
 
@@ -448,111 +515,143 @@ export function JobLifecycleAnimation() {
       <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
         <div>
           <div className="mb-6">
-            <p className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: dGold }}>
+            <p
+              className="text-sm font-black uppercase tracking-[0.18em]"
+              style={{ color: dGold }}
+            >
               Your job, start to finish
             </p>
-            <h3 className="mt-2 text-2xl font-black text-black lg:text-3xl">No payment upfront.</h3>
+            <h3 className="mt-2 text-2xl font-black text-black lg:text-3xl">
+              No payment upfront.
+            </h3>
             <p className="mt-3 max-w-md text-sm leading-6 text-black/60">
-              Free quote first. We invoice after the job is done — pay online, no cash, no chasing.
+              Free quote first. We invoice after the job is done — pay online,
+              no cash, no chasing.
             </p>
           </div>
 
-      {/* Mobile: vertical list */}
-      <div className="flex flex-col gap-3 sm:hidden">
-        {LIFECYCLE_STAGES.map((stage, i) => {
-          const isActive = i === active;
-          const isDone = i < active;
-          return (
-            <div key={stage.label} className="flex items-center gap-3">
-              <div className="relative flex-shrink-0">
-                {isActive && (
-                  <span
-                    className="absolute inset-0 animate-ping rounded-full opacity-40"
-                    style={{ backgroundColor: gold }}
-                  />
-                )}
-                <div
-                  className="relative grid h-10 w-10 place-items-center rounded-full border-2 transition-all duration-500"
-                  style={{
-                    backgroundColor: isActive ? gold : isDone ? K : "white",
-                    borderColor: isActive || isDone ? gold : "rgba(0,0,0,0.12)",
-                  }}
-                >
-                  {isDone ? (
-                    <Check size={16} color={gold} />
-                  ) : (
-                    <stage.Icon size={16} color={isActive ? "#fff" : "rgba(0,0,0,0.35)"} />
-                  )}
-                </div>
-              </div>
-              <p
-                className="text-sm font-black transition-all duration-300"
-                style={{ color: isActive ? K : isDone ? dGold : "rgba(0,0,0,0.35)" }}
-              >
-                {stage.label}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Desktop: horizontal with progress line */}
-      <div className="hidden sm:block">
-        <div className="relative flex items-start justify-between">
-          {/* Background track */}
-          <div
-            className="absolute left-5 right-5 top-5 h-0.5"
-            style={{ backgroundColor: "rgba(0,0,0,0.10)" }}
-          />
-          {/* Animated fill */}
-          <motion.div
-            className="absolute left-5 top-5 h-0.5 origin-left"
-            style={{ backgroundColor: gold }}
-            animate={{ scaleX: active / (LIFECYCLE_STAGES.length - 1) }}
-            transition={{ duration: 0.45, ease: "easeInOut" }}
-          />
-          {LIFECYCLE_STAGES.map((stage, i) => {
-            const isActive = i === active;
-            const isDone = i < active;
-            return (
-              <div key={stage.label} className="relative z-10 flex flex-col items-center gap-2">
-                <div className="relative">
-                  {isActive && (
-                    <span
-                      className="absolute inset-0 animate-ping rounded-full opacity-40"
-                      style={{ backgroundColor: gold }}
-                    />
-                  )}
-                  <div
-                    className="relative grid h-10 w-10 place-items-center rounded-full border-2 transition-all duration-500"
+          {/* Mobile: vertical list */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {LIFECYCLE_STAGES.map((stage, i) => {
+              const isActive = i === active;
+              const isDone = i < active;
+              return (
+                <div key={stage.label} className="flex items-center gap-3">
+                  <div className="relative flex-shrink-0">
+                    {isActive && (
+                      <span
+                        className="absolute inset-0 animate-ping rounded-full opacity-40"
+                        style={{ backgroundColor: gold }}
+                      />
+                    )}
+                    <div
+                      className="relative grid h-10 w-10 place-items-center rounded-full border-2 transition-all duration-500"
+                      style={{
+                        backgroundColor: isActive ? gold : isDone ? K : "white",
+                        borderColor:
+                          isActive || isDone ? gold : "rgba(0,0,0,0.12)",
+                      }}
+                    >
+                      {isDone ? (
+                        <Check size={16} color={gold} />
+                      ) : (
+                        <stage.Icon
+                          size={16}
+                          color={isActive ? "#fff" : "rgba(0,0,0,0.35)"}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <p
+                    className="text-sm font-black transition-all duration-300"
                     style={{
-                      backgroundColor: isActive ? gold : isDone ? K : "white",
-                      borderColor: isActive || isDone ? gold : "rgba(0,0,0,0.12)",
+                      color: isActive ? K : isDone ? dGold : "rgba(0,0,0,0.35)",
                     }}
                   >
-                    {isDone ? (
-                      <CheckCircle2 size={16} color={gold} />
-                    ) : (
-                      <stage.Icon size={16} color={isActive ? "#fff" : "rgba(0,0,0,0.35)"} />
-                    )}
-                  </div>
+                    {stage.label}
+                  </p>
                 </div>
-                <p
-                  className="max-w-[64px] text-center text-xs font-black transition-all duration-300"
-                  style={{ color: isActive ? K : isDone ? dGold : "rgba(0,0,0,0.35)" }}
-                >
-                  {stage.label}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: horizontal with progress line */}
+          <div className="hidden sm:block">
+            <div className="relative flex items-start justify-between">
+              {/* Background track */}
+              <div
+                className="absolute left-5 right-5 top-5 h-0.5"
+                style={{ backgroundColor: "rgba(0,0,0,0.10)" }}
+              />
+              {/* Animated fill */}
+              <motion.div
+                className="absolute left-5 top-5 h-0.5 origin-left"
+                style={{ backgroundColor: gold }}
+                animate={{ scaleX: active / (LIFECYCLE_STAGES.length - 1) }}
+                transition={{ duration: 0.45, ease: "easeInOut" }}
+              />
+              {LIFECYCLE_STAGES.map((stage, i) => {
+                const isActive = i === active;
+                const isDone = i < active;
+                return (
+                  <div
+                    key={stage.label}
+                    className="relative z-10 flex flex-col items-center gap-2"
+                  >
+                    <div className="relative">
+                      {isActive && (
+                        <span
+                          className="absolute inset-0 animate-ping rounded-full opacity-40"
+                          style={{ backgroundColor: gold }}
+                        />
+                      )}
+                      <div
+                        className="relative grid h-10 w-10 place-items-center rounded-full border-2 transition-all duration-500"
+                        style={{
+                          backgroundColor: isActive
+                            ? gold
+                            : isDone
+                              ? K
+                              : "white",
+                          borderColor:
+                            isActive || isDone ? gold : "rgba(0,0,0,0.12)",
+                        }}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={16} color={gold} />
+                        ) : (
+                          <stage.Icon
+                            size={16}
+                            color={isActive ? "#fff" : "rgba(0,0,0,0.35)"}
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <p
+                      className="max-w-[64px] text-center text-xs font-black transition-all duration-300"
+                      style={{
+                        color: isActive
+                          ? K
+                          : isDone
+                            ? dGold
+                            : "rgba(0,0,0,0.35)",
+                      }}
+                    >
+                      {stage.label}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Right column — reassurance / proof block */}
         <div className="rounded-xl border border-black/10 bg-white p-5 lg:p-6">
-          <p className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: dGold }}>
+          <p
+            className="text-xs font-black uppercase tracking-[0.2em]"
+            style={{ color: dGold }}
+          >
             Why this matters
           </p>
           <ul className="mt-4 space-y-3 text-sm font-semibold text-black/75">
@@ -563,7 +662,11 @@ export function JobLifecycleAnimation() {
               "Insured, with proof of insurance on request",
             ].map((line) => (
               <li key={line} className="flex items-start gap-2">
-                <Check size={16} className="mt-0.5 shrink-0" style={{ color: gold }} />
+                <Check
+                  size={16}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: gold }}
+                />
                 {line}
               </li>
             ))}
@@ -645,11 +748,44 @@ export function DigitalInvoiceAnim() {
         viewport={{ once: true }}
         transition={{ duration: 0.55, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
       >
-        <rect x="4" y="2.5" width="16" height="19" rx="2" fill="#fff" stroke={K} strokeWidth="1.5" />
+        <rect
+          x="4"
+          y="2.5"
+          width="16"
+          height="19"
+          rx="2"
+          fill="#fff"
+          stroke={K}
+          strokeWidth="1.5"
+        />
         <rect x="4" y="2.5" width="16" height="4" rx="2" fill={gold} />
-        <line x1="7" y1="11" x2="17" y2="11" stroke={dGold} strokeWidth="1.4" strokeLinecap="round" />
-        <line x1="7" y1="14" x2="15" y2="14" stroke={dGold} strokeWidth="1.4" strokeLinecap="round" />
-        <line x1="7" y1="17" x2="13" y2="17" stroke={dGold} strokeWidth="1.4" strokeLinecap="round" />
+        <line
+          x1="7"
+          y1="11"
+          x2="17"
+          y2="11"
+          stroke={dGold}
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+        <line
+          x1="7"
+          y1="14"
+          x2="15"
+          y2="14"
+          stroke={dGold}
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+        <line
+          x1="7"
+          y1="17"
+          x2="13"
+          y2="17"
+          stroke={dGold}
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
         <motion.circle
           cx="17.5"
           cy="18"
@@ -660,7 +796,12 @@ export function DigitalInvoiceAnim() {
           initial={{ scale: 0 }}
           whileInView={{ scale: 1 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.7, type: "spring", stiffness: 300, damping: 14 }}
+          transition={{
+            delay: 0.7,
+            type: "spring",
+            stiffness: 300,
+            damping: 14,
+          }}
         />
       </motion.svg>
     </div>

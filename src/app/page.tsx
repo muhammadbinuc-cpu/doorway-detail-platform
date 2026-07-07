@@ -148,9 +148,9 @@ export default function LandingPage() {
               Premium exterior care. Zero headaches.
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-black/65 sm:text-lg sm:leading-8">
-              Stop chasing unreliable contractors. Get specialized crews for
-              your windows, gutters, and landscaping who show up on time,
-              communicate clearly, and never ask for upfront payment.
+              Windows, pressure washing, gutters, landscaping — one crew that
+              shows up on time. You approve a written quote before we start, and
+              you don&apos;t pay a cent until the work is done.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
@@ -400,6 +400,40 @@ export default function LandingPage() {
                 <ArrowRight size={18} />
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOME SELLERS & REALTORS ── */}
+      <section className="px-5 py-16 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-8 rounded-2xl bg-[#111111] p-8 text-white lg:grid-cols-[1fr_auto] lg:items-center lg:p-12">
+            <div>
+              <p
+                className="text-sm font-black uppercase tracking-[0.24em]"
+                style={{ color: gold }}
+              >
+                Selling your home?
+              </p>
+              <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+                Curb appeal sells houses. We get yours listing-ready.
+              </h2>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-white/70">
+                Buyers decide from the driveway. Before your photos or first
+                showing, we clean the windows, wash the driveway and siding, and
+                clear the gutters — one visit, one written quote. Real estate
+                agents: send us your listings and we&apos;ll handle the outside
+                on your timeline.
+              </p>
+            </div>
+            <Link
+              href="/quote?src=realtor"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-6 py-4 font-black text-black transition hover:bg-white"
+              style={{ backgroundColor: gold }}
+            >
+              Get listing-ready
+              <ArrowRight size={18} />
+            </Link>
           </div>
         </div>
       </section>

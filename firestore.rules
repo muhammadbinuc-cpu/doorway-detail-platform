@@ -12,7 +12,10 @@ service cloud.firestore {
       //   the public invoice page works. UNPAID is included because the reminder cron flips
       //   overdue INVOICED → UNPAID, and those customers must still be able to pay.
       // - LIST (query): Block for unauthenticated users (prevents data scraping/enumeration)
+      // QUOTE_SENT is public so the emailed quote link (/quote/[id]) can render
+      // and the customer can accept it.
       allow get: if request.auth != null
+                 || resource.data.status == 'QUOTE_SENT'
                  || resource.data.status == 'INVOICED'
                  || resource.data.status == 'UNPAID'
                  || resource.data.status == 'PAID';

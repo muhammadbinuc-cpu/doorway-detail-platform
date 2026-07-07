@@ -15,6 +15,10 @@ import { ServiceLayer } from "@/lib/services";
 import { AppError, handleServerActionError } from "@/lib/errors";
 import { validateId } from "@/lib/validation";
 import { sendMail } from "@/lib/server/mailer";
+import {
+  recordEmailStatus,
+  resolveRecipientEmail,
+} from "@/lib/server/email-status";
 
 const PAYABLE_STATUSES = new Set(["INVOICED", "UNPAID"]);
 
@@ -56,7 +60,8 @@ export async function runInvoiceReminder(jobId: string) {
         "This invoice is already settled.",
       );
     }
-    if (!job.email)
+    const recipient = await resolveRecipientEmail(jobRef, job);
+    if (!recipient)
       throw new AppError(
         "validation-error",
         "No email on job",
@@ -74,7 +79,7 @@ export async function runInvoiceReminder(jobId: string) {
     const invoiceUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/invoice/${jobId}`;
 
     const emailResult = await sendMail({
-      to: job.email,
+      to: recipient,
       subject: `Payment reminder — Invoice ${invoiceLabel}`,
       react: InvoiceReminderEmail({
         clientName: job.name,
@@ -87,6 +92,7 @@ export async function runInvoiceReminder(jobId: string) {
     });
     if (!emailResult.ok)
       console.error("Reminder email failed (non-blocking):", emailResult.error);
+    await recordEmailStatus(jobRef, emailResult);
 
     if (job.phone) {
       try {

@@ -79,6 +79,7 @@ const notesSchema = z
 // 🔒 Valid job statuses (FSM states)
 const JOB_STATUSES = [
   "LEAD_RECEIVED",
+  "QUOTE_SENT",
   "SCHEDULED",
   "COMPLETED", // ✅ ADDED
   "INVOICED",

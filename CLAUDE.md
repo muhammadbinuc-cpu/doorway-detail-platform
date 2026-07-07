@@ -141,10 +141,11 @@ __tests__/
 Defined in `src/lib/fsm_logic.ts`. **Never bypass `isValidTransition()`.**
 
 ```
-LEAD_RECEIVED → SCHEDULED → COMPLETED → INVOICED → PAID
-                                                  → UNPAID → PAID
+LEAD_RECEIVED → QUOTE_SENT → SCHEDULED → COMPLETED → INVOICED → PAID
+              ↘ SCHEDULED (skip quote)                        → UNPAID → PAID
 LEAD_RECEIVED → LOST (terminal)
 LEAD_RECEIVED → CANCELLED
+QUOTE_SENT    → LOST | CANCELLED
 SCHEDULED     → CANCELLED
 CANCELLED     → SCHEDULED  (reschedule)
 
@@ -229,6 +230,21 @@ CANCELLED     → SCHEDULED  (reschedule)
 - **Invoice "View" can preview pre-invoiced jobs**: `firestore.rules` `allow get` on `jobs` includes `request.auth != null`, so admins can open `/invoice/[id]` for COMPLETED (not-yet-invoiced) jobs. `invoice/[id]/page.tsx` `fetchJob` is wrapped in try/finally so a denied read can't hang the spinner.
 - Sequential numbers via `assignInvoiceNumber(jobRef)` in `actions.ts` — a Firestore transaction on `counters/invoices`. **Idempotent**: re-sending an invoiced job does NOT bump the number. Assigned on first `→ INVOICED` (both `emailInvoice` and a manual `updateJobStatus`).
 - Business identity (name, address, phone, HST#) lives in `@/lib/business` `BUSINESS`.
+
+### Quotes (quote ≠ invoice)
+
+- **`emailQuote(jobId)`** (actions.ts) sends a priced QUOTE from a LEAD_RECEIVED/QUOTE_SENT job: assigns a `Q-`-prefixed number from its own counter (`counters/quotes`, seeded 1000, idempotent via `assignQuoteNumber`), stamps `quoteSentAt` + `quoteValidUntil` (+30 days, `QUOTE_VALID_DAYS` in business.ts), emails `QuoteEmail` with a PDF (same `InvoicePdf` component, `docType: "QUOTE"` → `renderQuotePdf`), and moves the job to `QUOTE_SENT`. Pricing fields are the same as invoices (`price`/`lineItems`/`invoiceItems`/discount/tax → `computeInvoiceTotals`), so the dashboard modal serves both — it relabels itself "Quote" and sends via `emailQuote` while the job is in quote stage.
+- **Public accept page `/quote/[id]`** (QUOTE_SENT readable per firestore.rules): shows the quote, valid-until, one-click Accept → public `acceptQuote` action (rate-limited, idempotent, blocks expired quotes) → sets `quoteAcceptedAt` + notifies the owner (email + SMS). Accepting does NOT schedule — admin confirms the date via `confirmBooking`, which is also the QUOTE_SENT → SCHEDULED transition.
+- Quote and invoice numbers are separate sequences on purpose; a job carries both once invoiced.
+
+### Email reliability
+
+- `mailer.ts` sets SMTP connection/greeting/socket timeouts (10–15s) and a replyTo; `sendMail` still never throws.
+- `emailInvoice`/`emailQuote` render their PDF in a local try/catch — a PDF failure sends the email without the attachment and surfaces it via `deliveryWarning`, never blocks the send.
+- Every customer send stamps `lastEmailAt`/`lastEmailStatus`/`lastEmailError` on the job (`recordEmailStatus` in `src/lib/server/email-status.ts`) → `EmailStatusBadge` on dashboard cards + invoices list.
+- `resolveRecipientEmail` (same module) prefers the client doc's current email over the stale copy on the job and re-syncs it — used by invoice, quote, and reminder sends.
+- `admin/layout.tsx` shows a red banner when `GMAIL_USER`/`GMAIL_APP_PASSWORD` are unset.
+- Known limitation: Gmail SMTP from a consumer address can land in spam; the real fix is custom-domain sending (SPF/DKIM via Resend/SES) — deferred.
 
 ### Getting paid + auto-chase
 
@@ -326,6 +342,13 @@ NEXT_PUBLIC_GOOGLE_REVIEW_URL  # Google review link; post-job review request onl
   appointmentReminderSent?: boolean;  // set by the appointment-reminder cron; reset to false on (re)booking
   appointmentReminderAt?: Timestamp;
   reviewRequestSent?: boolean;        // set once a review request goes out on → COMPLETED
+  quoteNumber?: number;     // sequential Q-number, assigned (idempotent) on first quote send
+  quoteSentAt?: Timestamp;
+  quoteValidUntil?: Timestamp;  // quoteSentAt + QUOTE_VALID_DAYS (30)
+  quoteAcceptedAt?: Timestamp;  // set by public acceptQuote; job stays QUOTE_SENT until scheduled
+  lastEmailAt?: Timestamp;      // outcome of the most recent customer email (recordEmailStatus)
+  lastEmailStatus?: 'sent' | 'failed';
+  lastEmailError?: string;
   invoiceNumber?: number;   // sequential, assigned (idempotent) on first → INVOICED
   invoicedAt?: Timestamp;   // when invoiceNumber was assigned; due date = +14 days
   paidAt?: Timestamp;       // set on payment (Stripe webhook or manual Mark Paid)
@@ -340,6 +363,7 @@ NEXT_PUBLIC_GOOGLE_REVIEW_URL  # Google review link; post-job review request onl
 }
 
 // counters/invoices { current: number } — atomic sequential invoice numbering (seed 1000).
+// counters/quotes   { current: number } — same pattern for quote numbers (seed 1000, "Q-" prefix).
 ```
 
 ### `clients`
@@ -362,7 +386,12 @@ NEXT_PUBLIC_GOOGLE_REVIEW_URL  # Google review link; post-job review request onl
 
 ```typescript
 {
-  services: { title: string; low: number; high: number }[];
+  services: {
+    title: string;
+    low: number;
+    high: number;
+  }
+  [];
   lastUpdated: Timestamp;
 }
 ```
@@ -385,6 +414,7 @@ from `src/lib/quote-pricing.ts`.
 | `/admin/schedule`                 | Protected   | Month calendar of scheduled jobs                 |
 | `/admin/clients`                  | Protected   | Client list                                      |
 | `/admin/clients/[id]`             | Protected   | Client detail                                    |
+| `/quote/[id]`                     | Semi-public | Quote view + one-click accept (QUOTE_SENT only)  |
 | `/invoice/[id]`                   | Semi-public | Invoice (INVOICED/PAID only)                     |
 | `/api/webhooks/stripe`            | Stripe      | Payment confirmation                             |
 | `/api/cron/invoice-reminders`     | CRON_SECRET | Daily auto-chase of overdue invoices             |

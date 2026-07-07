@@ -55,4 +55,27 @@ describe("Finite State Machine (FSM) Logic", () => {
   test("should BLOCK voiding a paid invoice: PAID -> CANCELLED", () => {
     expect(isValidTransition("PAID", "CANCELLED")).toBe(false);
   });
+
+  test("should allow sending a quote: LEAD_RECEIVED -> QUOTE_SENT", () => {
+    expect(isValidTransition("LEAD_RECEIVED", "QUOTE_SENT")).toBe(true);
+  });
+
+  test("should allow booking an accepted quote: QUOTE_SENT -> SCHEDULED", () => {
+    expect(isValidTransition("QUOTE_SENT", "SCHEDULED")).toBe(true);
+  });
+
+  test("should allow losing/cancelling a quoted job", () => {
+    expect(isValidTransition("QUOTE_SENT", "LOST")).toBe(true);
+    expect(isValidTransition("QUOTE_SENT", "CANCELLED")).toBe(true);
+  });
+
+  test("should BLOCK skipping ahead from a quote: QUOTE_SENT -> INVOICED/PAID", () => {
+    expect(isValidTransition("QUOTE_SENT", "INVOICED")).toBe(false);
+    expect(isValidTransition("QUOTE_SENT", "PAID")).toBe(false);
+  });
+
+  test("should BLOCK quoting after work started: SCHEDULED/COMPLETED -> QUOTE_SENT", () => {
+    expect(isValidTransition("SCHEDULED", "QUOTE_SENT")).toBe(false);
+    expect(isValidTransition("COMPLETED", "QUOTE_SENT")).toBe(false);
+  });
 });

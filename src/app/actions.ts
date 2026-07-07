@@ -15,6 +15,7 @@ import { ServiceLayer } from "@/lib/services";
 import Stripe from "stripe";
 import { ZodError } from "zod";
 import InvoiceEmail from "@/components/email/InvoiceEmail";
+import QuoteEmail from "@/components/email/QuoteEmail";
 import QuoteConfirmationEmail from "@/components/email/QuoteConfirmationEmail";
 import NewLeadEmail from "@/components/email/NewLeadEmail";
 import ReviewRequestEmail from "@/components/email/ReviewRequestEmail";
@@ -26,12 +27,19 @@ import { loadQuoteServiceOptions } from "@/lib/server/quote-pricing";
 import {
   BUSINESS,
   INVOICE_NUMBER_START,
+  QUOTE_NUMBER_START,
+  QUOTE_VALID_DAYS,
   formatInvoiceNumber,
+  formatQuoteNumber,
 } from "@/lib/business";
 import { runInvoiceReminder } from "@/lib/server/invoice-reminder";
 import { sendPaymentReceipt } from "@/lib/server/payment-receipt";
 import { sendMail } from "@/lib/server/mailer";
-import { renderInvoicePdf } from "@/lib/server/invoice-pdf";
+import { renderInvoicePdf, renderQuotePdf } from "@/lib/server/invoice-pdf";
+import {
+  recordEmailStatus,
+  resolveRecipientEmail,
+} from "@/lib/server/email-status";
 
 // 🔒 Security imports
 import {
@@ -155,6 +163,59 @@ async function assignInvoiceNumber(
     });
 
     return { invoiceNumber: next, invoicedAt };
+  });
+}
+
+/**
+ * 🔒 Atomically assign a sequential quote number (idempotent, own counter —
+ * quotes and invoices must never share a number sequence). Also stamps
+ * quoteSentAt + quoteValidUntil on first assignment.
+ */
+async function assignQuoteNumber(
+  jobRef: DocumentReference,
+): Promise<{ quoteNumber: number; quoteSentAt: Date; quoteValidUntil: Date }> {
+  const counterRef = adminDb.collection("counters").doc("quotes");
+
+  return adminDb.runTransaction(async (tx) => {
+    const jobSnap = await tx.get(jobRef);
+    const job = jobSnap.data();
+    if (!job)
+      throw new AppError(
+        "not-found",
+        `Job ${jobRef.id} not found`,
+        "Job not found",
+      );
+
+    if (typeof job.quoteNumber === "number" && job.quoteNumber > 0) {
+      const sentAt = job.quoteSentAt?.toDate?.() ?? new Date();
+      const validUntil =
+        job.quoteValidUntil?.toDate?.() ??
+        new Date(sentAt.getTime() + QUOTE_VALID_DAYS * 24 * 60 * 60 * 1000);
+      return {
+        quoteNumber: job.quoteNumber,
+        quoteSentAt: sentAt,
+        quoteValidUntil: validUntil,
+      };
+    }
+
+    const counterSnap = await tx.get(counterRef);
+    const current = counterSnap.exists
+      ? (counterSnap.data()?.current ?? QUOTE_NUMBER_START)
+      : QUOTE_NUMBER_START;
+    const next = current + 1;
+
+    const quoteSentAt = new Date();
+    const quoteValidUntil = new Date(
+      quoteSentAt.getTime() + QUOTE_VALID_DAYS * 24 * 60 * 60 * 1000,
+    );
+    tx.set(counterRef, { current: next }, { merge: true });
+    tx.update(jobRef, {
+      quoteNumber: next,
+      quoteSentAt: Timestamp.fromDate(quoteSentAt),
+      quoteValidUntil: Timestamp.fromDate(quoteValidUntil),
+    });
+
+    return { quoteNumber: next, quoteSentAt, quoteValidUntil };
   });
 }
 
@@ -959,13 +1020,21 @@ export async function emailInvoice(jobId: string) {
     const jobRef = adminDb.collection("jobs").doc(jobId);
     const job = (await jobRef.get()).data();
 
-    if (!job?.email)
+    if (!job)
+      throw new AppError(
+        "not-found",
+        `Job ${jobId} not found`,
+        "Job not found",
+      );
+    // Prefer the client's current email over the copy frozen at quote time.
+    const recipient = await resolveRecipientEmail(jobRef, job);
+    if (!recipient)
       throw new AppError(
         "validation-error",
         "No email on job",
         "Customer email not found",
       );
-    await ServiceLayer.logEvent("INVOICE_SENT", { jobId, email: job.email });
+    await ServiceLayer.logEvent("INVOICE_SENT", { jobId, email: recipient });
 
     // Assign a real sequential invoice number (idempotent) before sending.
     const { invoiceNumber, invoicedAt } = await assignInvoiceNumber(jobRef);
@@ -973,15 +1042,21 @@ export async function emailInvoice(jobId: string) {
     const dueDate = getDueDate(invoicedAt);
     const invoiceLabel = formatInvoiceNumber(invoiceNumber, jobId);
 
-    // Attach a PDF copy so the customer always has a saved record.
-    const pdf = await renderInvoicePdf(
-      { ...job, invoiceNumber, invoicedAt },
-      jobId,
-    );
+    // Attach a PDF copy so the customer always has a saved record. A PDF
+    // render failure must not block the email itself — send without it.
+    let pdf: Buffer | null = null;
+    try {
+      pdf = await renderInvoicePdf(
+        { ...job, invoiceNumber, invoicedAt },
+        jobId,
+      );
+    } catch (e) {
+      console.error("Invoice PDF render failed (sending without it):", e);
+    }
 
     // 🟢 Professional React Email with full breakdown + PDF attachment.
     const result = await sendMail({
-      to: job.email,
+      to: recipient,
       subject: `Invoice ${invoiceLabel} from Doorway Detail`,
       react: InvoiceEmail({
         clientName: job.name,
@@ -1005,13 +1080,15 @@ export async function emailInvoice(jobId: string) {
         }),
         business: BUSINESS,
       }),
-      attachments: [
-        {
-          filename: `Invoice-${invoiceLabel.replace("#", "")}.pdf`,
-          content: pdf,
-          contentType: "application/pdf",
-        },
-      ],
+      attachments: pdf
+        ? [
+            {
+              filename: `Invoice-${invoiceLabel.replace("#", "")}.pdf`,
+              content: pdf,
+              contentType: "application/pdf",
+            },
+          ]
+        : undefined,
     });
 
     if (job.phone) {
@@ -1029,15 +1106,214 @@ export async function emailInvoice(jobId: string) {
 
     // The invoice IS issued regardless of delivery — surface a warning, don't fail.
     await jobRef.update({ status: "INVOICED", lastUpdated: Timestamp.now() });
+    await recordEmailStatus(jobRef, result);
     revalidatePath("/admin");
-    return result.ok
-      ? { success: true }
-      : {
-          success: true,
-          deliveryWarning: `Invoice saved, but the email didn't send: ${result.error}`,
-        };
+    if (!result.ok)
+      return {
+        success: true,
+        deliveryWarning: `Invoice saved, but the email didn't send: ${result.error}`,
+      };
+    if (!pdf)
+      return {
+        success: true,
+        deliveryWarning:
+          "Invoice email sent, but the PDF attachment failed to generate — the customer can still view and pay online.",
+      };
+    return { success: true };
   } catch (error) {
     return handleServerActionError(error, "emailInvoice");
+  }
+}
+
+/**
+ * 🔒 Email a priced QUOTE to the customer (quote ≠ invoice). Assigns a Q-number,
+ * attaches a quote PDF, links to the public accept page, and moves the job to
+ * QUOTE_SENT. Safe to re-run for a resend — the number never bumps.
+ */
+export async function emailQuote(jobId: string) {
+  await requireAdmin();
+  try {
+    validateId(jobId);
+    const jobRef = adminDb.collection("jobs").doc(jobId);
+    const job = (await jobRef.get()).data();
+
+    if (!job)
+      throw new AppError(
+        "not-found",
+        `Job ${jobId} not found`,
+        "Job not found",
+      );
+    if (job.status !== "LEAD_RECEIVED" && job.status !== "QUOTE_SENT")
+      throw new AppError(
+        "validation-error",
+        `Cannot quote from ${job.status}`,
+        "This job is already past the quote stage.",
+      );
+    const recipient = await resolveRecipientEmail(jobRef, job);
+    if (!recipient)
+      throw new AppError(
+        "validation-error",
+        "No email on job",
+        "Customer email not found",
+      );
+    await ServiceLayer.logEvent("QUOTE_SENT", { jobId, email: recipient });
+
+    const { quoteNumber, quoteSentAt, quoteValidUntil } =
+      await assignQuoteNumber(jobRef);
+    const totals = computeInvoiceTotals(job);
+    const quoteLabel = formatQuoteNumber(quoteNumber, jobId);
+    const quoteUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/quote/${jobId}`;
+    const validUntilStr = quoteValidUntil.toLocaleDateString("en-CA", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
+    let pdf: Buffer | null = null;
+    try {
+      pdf = await renderQuotePdf(
+        { ...job, quoteNumber, quoteSentAt, quoteValidUntil },
+        jobId,
+      );
+    } catch (e) {
+      console.error("Quote PDF render failed (sending without it):", e);
+    }
+
+    const result = await sendMail({
+      to: recipient,
+      subject: `Your quote ${quoteLabel} from Doorway Detail`,
+      react: QuoteEmail({
+        clientName: job.name,
+        quoteNumber: quoteLabel,
+        quoteUrl,
+        lineItems: totals.lineItems,
+        invoiceItems:
+          Array.isArray(job.lineItems) && job.lineItems.length > 0
+            ? undefined
+            : (job.invoiceItems as string[] | undefined),
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        taxRate: totals.taxRate,
+        taxAmount: totals.taxAmount,
+        total: totals.total,
+        validUntil: validUntilStr,
+        quoteNotes: job.invoiceNotes || undefined,
+        business: BUSINESS,
+      }),
+      attachments: pdf
+        ? [
+            {
+              filename: `Quote-${quoteLabel}.pdf`,
+              content: pdf,
+              contentType: "application/pdf",
+            },
+          ]
+        : undefined,
+    });
+
+    if (job.phone) {
+      try {
+        const twilio = getTwilioClient();
+        await twilio.messages.create({
+          body: `Hi ${job.name}, your Doorway Detail quote (${quoteLabel}, $${totals.total.toFixed(2)}) is in your email. View & accept: ${quoteUrl}`,
+          from: process.env.TWILIO_FROM_NUMBER,
+          to: job.phone,
+        });
+      } catch (e) {
+        console.error("Quote SMS failed (non-blocking):", e);
+      }
+    }
+
+    if (job.status !== "QUOTE_SENT") {
+      await jobRef.update({
+        status: "QUOTE_SENT",
+        lastUpdated: Timestamp.now(),
+      });
+    }
+    await recordEmailStatus(jobRef, result);
+    revalidatePath("/admin");
+    if (!result.ok)
+      return {
+        success: true,
+        deliveryWarning: `Quote saved, but the email didn't send: ${result.error}`,
+      };
+    if (!pdf)
+      return {
+        success: true,
+        deliveryWarning:
+          "Quote email sent, but the PDF attachment failed to generate — the customer can still view it online.",
+      };
+    return { success: true };
+  } catch (error) {
+    return handleServerActionError(error, "emailQuote");
+  }
+}
+
+/**
+ * 🔒 PUBLIC: customer accepts a quote from /quote/[id]. Idempotent, only valid
+ * while the job is QUOTE_SENT. Does NOT schedule — the admin confirms a date.
+ */
+export async function acceptQuote(jobId: string) {
+  try {
+    await enforceRateLimit("quote");
+    validateId(jobId);
+    const jobRef = adminDb.collection("jobs").doc(jobId);
+    const job = (await jobRef.get()).data();
+    if (!job || job.status !== "QUOTE_SENT")
+      throw new AppError(
+        "not-found",
+        `Job ${jobId} not in QUOTE_SENT`,
+        "This quote is no longer available. Call or text us and we'll sort it out.",
+      );
+    if (job.quoteAcceptedAt) return { success: true }; // already accepted
+
+    const validUntil = job.quoteValidUntil?.toDate?.();
+    if (validUntil && validUntil.getTime() < Date.now())
+      throw new AppError(
+        "validation-error",
+        `Quote ${jobId} expired`,
+        "This quote has expired. Call or text us for an updated price.",
+      );
+
+    await jobRef.update({
+      quoteAcceptedAt: Timestamp.now(),
+      lastUpdated: Timestamp.now(),
+    });
+    await ServiceLayer.logEvent("QUOTE_ACCEPTED", { jobId });
+
+    // Tell the owner (email + SMS, both best-effort).
+    const quoteLabel = formatQuoteNumber(job.quoteNumber, jobId);
+    const total = computeInvoiceTotals(job).total;
+    try {
+      const ownerTo = sanitizeKey(process.env.GMAIL_USER) || BUSINESS.email;
+      if (ownerTo)
+        await sendMail({
+          to: ownerTo,
+          subject: `Quote accepted — ${job.name} (${quoteLabel}, $${total.toFixed(2)})`,
+          react: CustomMessageEmail({
+            clientName: "there",
+            message: `${job.name} accepted quote ${quoteLabel} ($${total.toFixed(2)}) for ${job.address}. Open the dashboard to schedule it.`,
+            business: BUSINESS,
+          }),
+        });
+    } catch (e) {
+      console.error("Quote-accepted owner email failed (non-blocking):", e);
+    }
+    try {
+      const twilio = getTwilioClient();
+      await twilio.messages.create({
+        body: `Quote accepted: ${job.name} — ${quoteLabel} ($${total.toFixed(2)}). Schedule it in the dashboard.`,
+        from: process.env.TWILIO_FROM_NUMBER,
+        to: BUSINESS.phone,
+      });
+    } catch (e) {
+      console.error("Quote-accepted owner SMS failed (non-blocking):", e);
+    }
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return handleServerActionError(error, "acceptQuote");
   }
 }
 
@@ -1079,9 +1355,14 @@ export async function markInvoicePaid(jobId: string, method: string) {
       amountPaid: total,
       lastUpdated: Timestamp.now(),
     });
-    await sendPaymentReceipt(jobId); // non-blocking
+    const receipt = await sendPaymentReceipt(jobId); // non-blocking
     revalidatePath("/admin");
-    return { success: true };
+    return receipt.ok
+      ? { success: true }
+      : {
+          success: true,
+          deliveryWarning: `Marked paid, but the receipt email didn't send: ${receipt.error}`,
+        };
   } catch (error) {
     if (error instanceof ZodError)
       return { success: false, error: error.issues[0].message };

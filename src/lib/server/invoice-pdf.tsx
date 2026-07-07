@@ -9,7 +9,11 @@ import {
   getDueDate,
   type InvoiceJobLike,
 } from "@/lib/invoice";
-import { BUSINESS, formatInvoiceNumber } from "@/lib/business";
+import {
+  BUSINESS,
+  formatInvoiceNumber,
+  formatQuoteNumber,
+} from "@/lib/business";
 
 const fmtDate = (d: Date) =>
   d.toLocaleDateString("en-CA", {
@@ -37,6 +41,15 @@ interface InvoicePdfJob extends InvoiceJobLike {
   invoiceNotes?: string;
 }
 
+interface QuotePdfJob extends InvoiceJobLike {
+  quoteSentAt?: unknown;
+  quoteValidUntil?: unknown;
+  quoteNumber?: number;
+  name?: string;
+  address?: string;
+  invoiceNotes?: string;
+}
+
 export async function renderInvoicePdf(
   job: InvoicePdfJob,
   jobId: string,
@@ -59,6 +72,42 @@ export async function renderInvoicePdf(
       lineItems: totals.lineItems,
       // Included-items list only applies in the lump "one price + list" mode
       // (i.e. when there are no explicit priced line items).
+      invoiceItems:
+        Array.isArray(job.lineItems) && job.lineItems.length > 0
+          ? undefined
+          : job.invoiceItems,
+      subtotal: totals.subtotal,
+      discount: totals.discount,
+      taxRate: totals.taxRate,
+      taxAmount: totals.taxAmount,
+      total: totals.total,
+      notes: job.invoiceNotes || undefined,
+    }),
+  );
+}
+
+/** Same document as the invoice PDF, rendered with quote wording. */
+export async function renderQuotePdf(
+  job: QuotePdfJob,
+  jobId: string,
+): Promise<Buffer> {
+  const totals = computeInvoiceTotals(job);
+  const sentAt = toDate(job.quoteSentAt) ?? new Date();
+  const validUntil = toDate(job.quoteValidUntil) ?? sentAt;
+  return renderToBuffer(
+    InvoicePdf({
+      docType: "QUOTE",
+      businessName: BUSINESS.name,
+      businessAddress: BUSINESS.address,
+      businessPhone: BUSINESS.phone,
+      hstNumber: BUSINESS.hstNumber,
+      clientName: job.name ?? "",
+      clientAddress: job.address ?? "",
+      invoiceLabel: formatQuoteNumber(job.quoteNumber, jobId),
+      issuedDate: fmtDate(sentAt),
+      dueDate: fmtDate(validUntil),
+      status: "",
+      lineItems: totals.lineItems,
       invoiceItems:
         Array.isArray(job.lineItems) && job.lineItems.length > 0
           ? undefined
